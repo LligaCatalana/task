@@ -1,0 +1,1134 @@
+<!DOCTYPE html>
+<html lang="ca">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Dissenyador de Tasques Parapent - XCTSK (v5.1)</title>
+  
+  <!-- Leaflet CSS -->
+  <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
+  
+  <style>
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+    body { font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; display: flex; height: 100vh; background: #f4f6f9; }
+    
+    #sidebar {
+      width: 440px;
+      background: #ffffff;
+      border-right: 1px solid #dcdfe6;
+      display: flex;
+      flex-direction: column;
+      z-index: 1000;
+      box-shadow: 2px 0 8px rgba(0,0,0,0.05);
+    }
+
+    .header { padding: 10px 12px; background: #1e293b; color: white; }
+    .header h1 { font-size: 1rem; font-weight: 600; }
+
+    .content { padding: 8px; overflow-y: auto; flex: 1; }
+
+    .section {
+      background: #f8fafc;
+      border: 1px solid #e2e8f0;
+      border-radius: 6px;
+      padding: 8px;
+      margin-bottom: 8px;
+    }
+
+    .section h3 {
+      font-size: 0.75rem;
+      text-transform: uppercase;
+      letter-spacing: 0.5px;
+      color: #64748b;
+      margin-bottom: 6px;
+    }
+
+    label { display: block; font-size: 0.75rem; font-weight: 600; margin-bottom: 2px; color: #334155; }
+    select, input[type="file"], input[type="number"], input[type="text"], button {
+      width: 100%;
+      padding: 4px 6px;
+      border: 1px solid #cbd5e1;
+      border-radius: 4px;
+      font-size: 0.8rem;
+      background: white;
+      margin-bottom: 4px;
+    }
+
+    /* FILAS COMPACTAS PARA CONTROLES */
+    .compact-row {
+      display: flex;
+      gap: 6px;
+      align-items: center;
+      margin-bottom: 4px;
+    }
+    .compact-row label {
+      margin-bottom: 0;
+      white-space: nowrap;
+      min-width: 70px;
+    }
+    .compact-row select, .compact-row input {
+      margin-bottom: 0;
+    }
+
+    .input-group {
+      display: flex;
+      gap: 4px;
+      margin-bottom: 4px;
+    }
+    .input-group input {
+      margin-bottom: 0;
+      text-transform: uppercase;
+    }
+    .input-group button {
+      width: auto;
+      white-space: nowrap;
+      margin-bottom: 0;
+      padding: 4px 8px;
+    }
+
+    button.btn-add {
+      background: #2563eb;
+      color: white;
+      font-weight: 600;
+      border: none;
+      cursor: pointer;
+      transition: background 0.2s;
+    }
+    button.btn-add:hover { background: #1d4ed8; }
+
+    .info-box {
+      font-size: 0.75rem;
+      background: #e0f2fe;
+      color: #0369a1;
+      padding: 4px 6px;
+      border-radius: 4px;
+      border-left: 3px solid #0284c7;
+      margin-top: 4px;
+    }
+
+    .task-code-badge {
+      background: #f1f5f9;
+      border: 1px dashed #0284c7;
+      padding: 4px 8px;
+      border-radius: 4px;
+      margin-bottom: 6px;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+    }
+    .task-code-badge .lbl { font-size: 0.72rem; color: #475569; font-weight: 600; }
+    .task-code-badge .val { font-size: 0.95rem; color: #0284c7; font-weight: 800; letter-spacing: 1px; }
+
+    .distance-summary {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 6px;
+    }
+    .distance-card {
+      background: #ffffff;
+      border: 1px solid #e2e8f0;
+      padding: 4px;
+      border-radius: 4px;
+      text-align: center;
+    }
+    .distance-card .val {
+      font-size: 0.95rem;
+      font-weight: bold;
+      color: #0f172a;
+    }
+    .distance-card .lbl {
+      font-size: 0.65rem;
+      color: #64748b;
+      text-transform: uppercase;
+    }
+
+    /* ESTILOS DE FILA ULTRA COMPACTA DE TASK */
+    .task-item {
+      background: #ffffff;
+      border: 1px solid #cbd5e1;
+      border-radius: 4px;
+      padding: 3px 5px;
+      margin-bottom: 3px;
+      box-shadow: 0 1px 2px rgba(0,0,0,0.03);
+      cursor: grab;
+      display: flex;
+      align-items: center;
+      gap: 5px;
+      font-size: 0.78rem;
+    }
+    .task-item:active { cursor: grabbing; }
+    .task-item.dragging { opacity: 0.3; border: 2px dashed #2563eb; }
+    .task-item.drag-over { border-top: 2px solid #2563eb; }
+
+    .tp-handle { color: #94a3b8; font-size: 0.8rem; cursor: grab; }
+    .tp-num { color: #64748b; font-weight: bold; min-width: 28px; white-space: nowrap; }
+    .tp-code { font-weight: 800; color: #1e293b; white-space: nowrap; }
+    .tp-name { color: #475569; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; flex: 1; }
+    
+    .role-badge {
+      font-size: 0.65rem;
+      font-weight: 800;
+      padding: 1px 3px;
+      border-radius: 3px;
+      text-transform: uppercase;
+      white-space: nowrap;
+    }
+    .role-takeoff { background: #fee2e2; color: #dc2626; }
+    .role-sss { background: #dcfce7; color: #16a34a; }
+    .role-ess { background: #ffedd5; color: #ea580c; }
+    .role-goal { background: #fee2e2; color: #dc2626; }
+    .role-tp { background: #f1f5f9; color: #64748b; }
+
+    .radius-compact-container {
+      display: flex;
+      align-items: center;
+      gap: 2px;
+    }
+    .radius-compact-input {
+      width: 54px !important;
+      padding: 1px 3px !important;
+      margin-bottom: 0 !important;
+      text-align: right;
+      font-size: 0.78rem !important;
+      font-weight: bold;
+    }
+    .radius-unit { font-size: 0.7rem; color: #64748b; margin-right: 2px; }
+
+    .btn-remove-compact {
+      background: none;
+      color: #ef4444;
+      border: none;
+      font-weight: bold;
+      font-size: 0.85rem;
+      cursor: pointer;
+      width: 18px !important;
+      height: 18px;
+      padding: 0 !important;
+      margin-bottom: 0 !important;
+      line-height: 1;
+      border-radius: 3px;
+    }
+    .btn-remove-compact:hover { background: #fee2e2; }
+
+    /* ESTILOS DE HORARIOS Y EXPORTACIÓN */
+    .time-grid {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 6px;
+      margin-bottom: 6px;
+    }
+
+    .time-grid input[type="time"] {
+      width: 100%;
+      padding: 3px 5px;
+      border: 1px solid #cbd5e1;
+      border-radius: 4px;
+      font-size: 0.78rem;
+      margin-bottom: 0;
+    }
+
+    button.btn-export {
+      background: #16a34a;
+      color: white;
+      font-weight: 700;
+      border: none;
+      padding: 6px;
+      border-radius: 4px;
+      cursor: pointer;
+      transition: background 0.2s;
+      width: 100%;
+      font-size: 0.8rem;
+    }
+
+    button.btn-export:hover {
+      background: #15803d;
+    }
+
+    #map { flex: 1; height: 100vh; }
+    
+    .wpt-tooltip {
+      background: rgba(15, 23, 42, 0.85);
+      border: none;
+      color: #fff;
+      font-weight: 500;
+      font-size: 11px;
+      border-radius: 4px;
+      padding: 2px 6px;
+    }
+
+    .wpt-task-label {
+      text-align: center;
+      font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+      font-size: 11px;
+      font-weight: 700;
+      color: #0f172a;
+      line-height: 1.1;
+      text-shadow: 1px 1px 2px #ffffff, -1px -1px 2px #ffffff, 1px -1px 2px #ffffff, -1px 1px 2px #ffffff;
+      pointer-events: none;
+      white-space: nowrap;
+    }
+    .wpt-task-label b {
+      font-size: 13px;
+      color: #000000;
+    }
+
+    .radius-drag-handle {
+      width: 12px;
+      height: 12px;
+      background-color: #ea580c;
+      border: 2px solid #ffffff;
+      border-radius: 50%;
+      box-shadow: 0 0 4px rgba(0,0,0,0.4);
+      cursor: ew-resize;
+    }
+  </style>
+</head>
+<body>
+
+  <div id="sidebar">
+    <div class="header">
+      <h1>🪂 Dissenyador de Mànigues (XCTSK) v5.1</h1>
+    </div>
+
+    <div class="content">
+      <!-- SECCIÓN 1: COMPACTADA -->
+      <div class="section">
+        <h3>1. Zona / Carregar Balises</h3>
+        
+        <div class="compact-row">
+          <label for="preloadedSelect">Zona:</label>
+          <select id="preloadedSelect" onchange="loadPreloadedZone()">
+            <option value="">-- Seleccionar Zona --</option>
+            <option value="ager">AGER</option>
+            <option value="berga">BERGA</option>
+            <option value="boi">BOI</option>
+            <option value="bellmunt">BELLMUNT</option>
+          </select>
+        </div>
+
+        <div class="compact-row">
+          <label for="fileInput">Local (.WPT):</label>
+          <input type="file" id="fileInput" accept=".wpt,.WPT">
+        </div>
+
+        <div class="compact-row">
+          <label for="taskCodeInput">Núvol (XContest):</label>
+          <div class="input-group" style="flex:1;">
+            <input type="text" id="taskCodeInput" placeholder="Ex: xono">
+            <button class="btn-add" onclick="fetchTaskFromCloud()">📥 Carregar</button>
+          </div>
+        </div>
+
+        <div id="fileStatus" class="info-box">Tria una zona, carrega un fitxer WPT o baixa una màniga del núvol.</div>
+      </div>
+
+      <!-- SECCIÓN 2: COMPACTADA -->
+      <div class="section" id="taskControlSection" style="display: none;">
+        <h3>2. Afegir Balises</h3>
+        <div class="compact-row">
+          <select id="turnpointSelect" style="flex:1;"></select>
+          <button class="btn-add" style="width: auto; padding: 4px 10px;" onclick="addSelectedTurnpoint()">➕ Afegir</button>
+        </div>
+      </div>
+
+      <div class="section" id="metricsSection" style="display: none;">
+        <h3>Mètriques de Distància</h3>
+        <div class="distance-summary">
+          <div class="distance-card">
+            <div class="lbl">Dist. Centres</div>
+            <div class="val" id="centerDistVal">0.0 km</div>
+          </div>
+          <div class="distance-card">
+            <div class="lbl">Dist. Òptima</div>
+            <div class="val" id="optDistVal" style="color: #7c3aed;">0.0 km</div>
+          </div>
+        </div>
+      </div>
+
+      <div class="section" id="taskSequenceSection" style="display: none;">
+        <h3>3. Seqüència de la Màniga</h3>
+        <div id="taskContainer"></div>
+      </div>
+
+      <div class="section" id="exportSection" style="display: none;">
+        <h3>4. Horaris i Exportació</h3>
+        
+        <div class="task-code-badge" id="taskCodeDisplayBox">
+          <span class="lbl">Codi XContest Actiu:</span>
+          <span class="val" id="currentTaskCodeDisplay">----</span>
+        </div>
+
+        <div class="time-grid">
+          <div>
+            <label for="sssTime">Obertura SSS (Local):</label>
+            <input type="time" id="sssTime" value="13:00">
+          </div>
+          <div>
+            <label for="taskDeadline">Tancament (Local):</label>
+            <input type="time" id="taskDeadline" value="18:00">
+          </div>
+        </div>
+
+        <div class="time-grid" style="margin-top: 6px;">
+          <button class="btn-export" onclick="exportXCTSK()">💾 Descarregar .XCTSK</button>
+          <button class="btn-export" style="background: #0284c7;" onclick="openXContestTool()">🚀 Desar a XContest</button>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <div id="map"></div>
+
+  <!-- Leaflet JS -->
+  <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+
+  <script>
+    const map = L.map('map').setView([42.10, 1.80], 11);
+
+    const topoMap = L.tileLayer('https://{s}.tile.opentopomap.org/{z}/{x}/{y}.png', {
+      maxZoom: 17,
+      attribution: 'Map data: &copy; OpenStreetMap, SRTM | Map style: &copy; OpenTopoMap'
+    }).addTo(map);
+
+    const esriWorldTopo = L.tileLayer('https://server.arcgisonline.com/ArcGIS/rest/services/World_Topo_Map/MapServer/tile/{z}/{y}/{x}', {
+      attribution: 'Tiles &copy; Esri'
+    });
+
+    L.control.layers({
+      "OpenTopoMap (Relleu)": topoMap,
+      "Esri Topo": esriWorldTopo
+    }).addTo(map);
+
+    const preloadedZones = {
+      ager: `OziExplorer Waypoint File Version 1.1\nWGS 84\nReserved 2\nReserved 3\n1,B01A,42.039810,0.766530,0,0,1,3,0,65535,ST ALIS,0,0,0,5341\n2,B02A,42.017260,0.745270,0,0,1,3,0,65535,MACIAROL,0,0,0,2415\n3,B03A,42.031980,0.701730,0,0,1,3,0,65535,TORRE DELS MOROS,0,0,0,3321\n4,B04A,42.081460,0.729430,0,0,1,3,0,65535,ALSAMORA,0,0,0,2844\n5,B05A,42.007150,0.720260,0,0,1,3,0,65535,AGULLO,0,0,0,2208\n6,B06A,41.997890,0.790830,0,0,1,3,0,65535,LA REGOLA,0,0,0,1683\n7,B07A,41.978900,0.750260,0,0,1,3,0,65535,PORT AGER,0,0,0,3048\n8,B08A,42.051830,0.655200,0,0,1,3,0,65535,MONTFALCO,0,0,0,2477\n9,B09A,42.013480,0.826030,0,0,1,3,0,65535,L AMETLLA,0,0,0,1877\n10,B10A,41.966460,0.756770,0,0,1,3,0,65535,FONTDEPOU,0,0,0,2710\n11,B11A,42.031600,0.859710,0,0,1,3,0,65535,PLA D ESCUMO,0,0,0,3189\n12,B12A,42.006560,0.851020,0,0,1,3,0,65535,ESTACIO AGER,0,0,0,1204\n13,B13A,42.105000,0.856590,0,0,1,3,0,65535,CASTELL DE MUR,0,0,0,2881\n14,B14A,42.148760,0.754170,0,0,1,3,0,65535,TOSSAL GROS,0,0,0,3550\n15,B15A,42.095430,0.618140,0,0,1,3,0,65535,QUINTILLA,0,0,0,3451\n16,B16A,42.020610,0.889310,0,0,1,3,0,65535,PEDRERA MEIA,0,0,0,2799\n17,B17A,42.148760,0.693230,0,0,1,3,0,65535,PONT MONTANYANA,0,0,0,1795\n18,B18A,42.074540,0.917040,0,0,1,3,0,65535,LLIMIANA,0,0,0,2497\n19,B19A,41.903950,0.764160,0,0,1,3,0,65535,LES AVELLANES,0,0,0,1955\n20,B20A,41.977780,0.940920,0,0,1,3,0,65535,SANT MAMET,0,0,0,4491\n21,B21A,42.167260,0.891100,0,0,1,3,0,65535,TREMP ESTACIO,0,0,0,1539\n22,B22A,42.175270,0.946180,0,0,1,3,0,65535,ANT SUTERRANYA,0,0,0,2959\n23,B23A,42.002730,1.018110,0,0,1,3,0,65535,ERM DE MEIA,0,0,0,2867\n24,B24A,42.081150,1.031230,0,0,1,3,0,65535,ST SALVADOR,0,0,0,2612\n25,B25A,42.122080,1.050830,0,0,1,3,0,65535,ISONA,0,0,0,2261\n26,B26A,42.309370,0.740760,0,0,1,3,0,65535,SOPEIRA,0,0,0,2267\n27,B27A,42.214970,1.021770,0,0,1,3,0,65535,PESSONADA,0,0,0,2951\n28,B28A,42.161400,1.091630,0,0,1,3,0,65535,ABELLA CONCA,0,0,0,3122\n29,B29A,42.171220,1.163180,0,0,1,3,0,65535,BOIXOLS,0,0,0,3806\n30,B30A,42.199460,1.252420,0,0,1,3,0,65535,MONTANISSELL,0,0,0,3711\n31,B31A,42.234720,1.243450,0,0,1,3,0,65535,ERM CABO,0,0,0,2533\n32,B32A,42.173880,1.312680,0,0,1,3,0,65535,COLL DE NARGO,0,0,0,1903\n33,B33A,42.209010,1.301220,0,0,1,3,0,65535,SANTA FE,0,0,0,3937\n34,B34A,42.475120,0.545130,0,0,1,3,0,65535,ANT COLL FADAS,0,0,0,5348\n35,B35A,42.497790,0.661840,0,0,1,3,0,65535,CASTANESA,0,0,0,4915\n36,B36A,42.102180,1.364960,0,0,1,3,0,65535,ROC DE LA MUA,0,0,0,3655\n37,B37A,42.242380,1.311870,0,0,1,3,0,65535,ORGANYA ANT,0,0,0,5348\n38,B38A,42.093020,1.624270,0,0,1,3,0,65535,BUSA ANT,0,0,0,4564\n39,B39A,42.239750,1.702900,0,0,1,3,0,65535,PEDRAFORCA SUP,0,0,0,7927\n40,B40A,42.137850,1.772730,0,0,1,3,0,65535,RASOS PEGUERA,0,0,0,6604\n41,B41A,42.107170,1.827520,0,0,1,3,0,65535,QUERALT,0,0,0,3612\n42,B42A,42.157490,0.812870,0,0,1,3,0,65535,FIGOLS TREMP,0,0,0,2431\n43,B43A,42.419380,0.132310,0,0,1,3,0,65535,AINSA,0,0,0,1959\n44,B44A,42.408520,0.395430,0,0,1,3,0,65535,CAMPO,0,0,0,2257\n45,B45A,42.188000,0.345700,0,0,1,3,0,65535,GRAUS,0,0,0,1490\n46,B46A,41.877680,0.559650,0,0,1,3,0,65535,ERM ST SALVADOR,0,0,0,2267\n47,B47A,41.914310,0.511690,0,0,1,3,0,65535,DESV CASTILLONROI,0,0,0,1978\n48,B48A,41.858130,0.850410,0,0,1,3,0,65535,MONTERO,0,0,0,1656\n49,D01A,42.046350,0.745990,0,0,1,3,0,65535,COLL D ARES,0,0,0,5118\n50,D02A,42.035710,0.735950,0,0,1,3,0,65535,LA NOVA,0,0,0,4032\n51,D03A,42.030330,0.765300,0,0,1,3,0,65535,GABRIELO,0,0,0,4242\n52,D04A,41.894440,0.532940,0,0,1,3,0,65535,CASTILLONROI,0,0,0,2106\n53,D05A,41.865800,0.818583,0,0,1,3,0,65535,SANTLLO,0,0,0,2060\n54,G01A,42.003800,0.766580,0,0,1,3,0,65535,CAMPING AGER,0,0,0,1975\n55,G02A,42.141450,0.931240,0,0,1,3,0,65535,VILAMITJANA,0,0,0,1492\n56,G03A,42.237350,0.718130,0,0,1,3,0,65535,AREN AERODROM,0,0,0,2034\n57,G06A,42.222240,0.974360,0,0,1,3,0,65535,CHIRINGUITO,0,0,0,1660\n58,G07A,41.796050,0.805720,0,0,1,3,0,65535,BALAGUER BOMBERS,0,0,0,876\n59,G08A,42.245600,0.965580,0,0,1,3,0,65535,POBLA SEGUR,0,0,0,1693\n60,G09A,41.920350,1.185700,0,0,1,3,0,65535,PONTS,0,0,0,1181\n61,G10A,42.076860,1.305480,0,0,1,3,0,65535,OLIANA,0,0,0,1506\n62,G11A,42.476040,0.717220,0,0,1,3,0,65535,VILALLER,0,0,0,3264\n63,G12A,42.400170,1.131880,0,0,1,3,0,65535,SORT,0,0,0,2215\n64,G13A,42.501950,0.798260,0,0,1,3,0,65535,BARRUERA,0,0,0,3563\n65,G14A,42.209510,1.331290,0,0,1,3,0,65535,ORGANYA RIU,0,0,0,1729\n66,G15A,42.512640,0.489090,0,0,1,3,0,65535,CASTEJON SOS,0,0,0,2953\n67,G16A,41.809480,1.395470,0,0,1,3,0,65535,TORA,0,0,0,1400\n68,G17A,42.359550,1.472460,0,0,1,3,0,65535,LA SEU,0,0,0,2254\n69,G18A,41.744770,1.557180,0,0,1,3,0,65535,CALAF,0,0,0,2354\n70,G19A,42.084390,1.822740,0,0,1,3,0,65535,AVIA-FAC,0,0,0,2303\n71,G20A,42.386460,1.865100,0,0,1,3,0,65535,ALP AERODROM,0,0,0,3520\n72,G21A,42.043520,2.259450,0,0,1,3,0,65535,TORELLO,0,0,0,1647\n73,G22A,41.991900,1.530720,0,0,1,3,0,65535,SOLSONA,0,0,0,2201\n74,G23A,41.988650,1.030140,0,0,1,3,0,65535,VVA DE MEIA,0,0,0,1883`,
+      berga: `OziExplorer Waypoint File Version 1.0\nWGS 84\nReserved 2\nReserved 3\n   1,B01C           ,  42.107167,   1.827517,44694.6700000,0, 1, 3, 0, 65535,QUERALT                                 , 0, 0, 0, 3612\n   2,B02C           ,  42.104719,   1.799865,44694.6700000,0, 1, 3, 0, 65535,COLL GRAN                               , 0, 0, 0, 4626\n   3,B03C           ,  42.091417,   1.856100,44694.6700000,0, 1, 3, 0, 65535,CAMPING BERGA                           , 0, 0, 0, 2060\n   4,B04C           ,  42.120500,   1.787751,44694.6700000,0, 1, 3, 0, 65535,COGULLO ESTELA                          , 0, 0, 0, 5784\n   5,B05C           ,  42.128800,   1.786700,44694.6700000,0, 1, 3, 0, 65535,ROCA D AURO                             , 0, 0, 0, 6526\n   6,B06C           ,  42.101117,   1.765350,44694.6700000,0, 1, 3, 0, 65535,LLADRES W                               , 0, 0, 0, 5039\n   7,B07C           ,  42.064797,   1.775428,44694.6700000,0, 1, 3, 0, 65535,3a MARIA                                , 0, 0, 0, 3796\n   8,B08C           ,  42.078283,   1.753217,44694.6700000,0, 1, 3, 0, 65535,ERM CAPOLAT                             , 0, 0, 0, 4127\n   9,B09C           ,  42.052467,   1.773183,44694.6700000,0, 1, 3, 0, 65535,ESPUNYOLA                               , 0, 0, 0, 2644\n  10,B10C           ,  42.115837,   1.731497,44694.6700000,0, 1, 3, 0, 65535,ROCA TERCANA                            , 0, 0, 0, 4531\n  11,B11C           ,  42.065348,   1.748041,44694.6700000,0, 1, 3, 0, 65535,5a MARIA                                , 0, 0, 0, 3888\n  12,B12C           ,  42.188050,   1.777217,44694.6700000,0, 1, 3, 0, 65535,SERRAT VOLTOR                           , 0, 0, 0, 7484\n  13,B13C           ,  42.179239,   1.756101,44694.6700000,0, 1, 3, 0, 65535,PLA DE LES TORES                        , 0, 0, 0, 7454\n  14,B14C           ,  42.067846,   1.705450,44694.6700000,0, 1, 3, 0, 65535,9a MARIA                                , 0, 0, 0, 4383\n  15,B15C           ,  42.018057,   1.764851,44694.6700000,0, 1, 3, 0, 65535,MONTCLAR                                , 0, 0, 0, 2392\n  16,B16C           ,  42.150450,   1.698917,44694.6700000,0, 1, 3, 0, 65535,MONTCALB                                , 0, 0, 0, 4633\n  17,B17C           ,  42.189250,   1.738083,44694.6700000,0, 1, 3, 0, 65535,GALLINA PELADA                          , 0, 0, 0, 7441\n  18,B18C           ,  42.131883,   1.993067,44694.6700000,0, 1, 3, 0, 65535,BORREDA                                 , 0, 0, 0, 2687\n  19,B19C           ,  42.233100,   1.879317,44694.6700000,0, 1, 3, 0, 65535,GUARDIOLA BERGUEDA                      , 0, 0, 0, 2379\n  20,B20C           ,  42.146541,   1.648899,44694.6700000,0, 1, 3, 0, 65535,GUIXERS                                 , 0, 0, 0, 4377\n  21,B21C           ,  42.196883,   1.970233,44694.6700000,0, 1, 3, 0, 65535,PUIG-LLUENT                             , 0, 0, 0, 5292\n  22,B22C           ,  41.968804,   1.879468,44694.6700000,0, 1, 3, 0, 65535,PUIG-REIG                               , 0, 0, 0, 1424\n  23,B23C           ,  42.093021,   1.624267,44694.6700000,0, 1, 3, 0, 65535,BUSA ANT                                , 0, 0, 0, 4564\n  24,B24C           ,  42.235604,   1.706057,44694.6700000,0, 1, 3, 0, 65535,PEDRAFORCA INF                          , 0, 0, 0, 7874\n  25,B25C           ,  42.245283,   1.974633,44694.6700000,0, 1, 3, 0, 65535,POBLA LILLET                            , 0, 0, 0, 2818\n  26,B26C           ,  42.234133,   1.660950,44694.6700000,0, 1, 3, 0, 65535,GOSOL                                   , 0, 0, 0, 4764\n  27,B27C           ,  42.283473,   1.726314,44694.6700000,0, 1, 3, 0, 65535,COMABONA                                , 0, 0, 0, 8356\n  28,B28C           ,  42.280740,   1.670436,44694.6700000,0, 1, 3, 0, 65535,PIC COSTA CABIROLERA                    , 0, 0, 0, 8543\n  29,B29C           ,  42.300393,   1.935488,44694.6700000,0, 1, 3, 0, 65535,PUIGLLANCADA                            , 0, 0, 0, 7904\n  30,B30C           ,  42.246630,   2.041480,44694.6700000,0, 1, 3, 0, 65535,COLL MEROLLA                            , 0, 0, 0, 3396\n  31,B31C           ,  42.150860,   1.539404,44694.6700000,0, 1, 3, 0, 65535,PORT DEL COMTE                          , 0, 0, 0, 7267\n  32,B32C           ,  41.912072,   1.681698,44694.6700000,0, 1, 3, 0, 65535,CARDONA                                 , 0, 0, 0, 1532\n  33,B33C           ,  42.297830,   1.992530,44694.6700000,0, 1, 3, 0, 65535,LA CREUETA                              , 0, 0, 0, 6352\n  34,B34C           ,  42.285947,   1.636111,44694.6700000,0, 1, 3, 0, 65535,VULTURO                                 , 0, 0, 0, 8688\n  35,B35C           ,  42.262949,   1.597530,44694.6700000,0, 1, 3, 0, 65535,CADINELL                                , 0, 0, 0, 6932\n  36,B36C           ,  42.286960,   1.584431,44694.6700000,0, 1, 3, 0, 65535,TORRETA CADI                            , 0, 0, 0, 8406\n  37,B37C           ,  42.129167,   1.479073,44694.6700000,0, 1, 3, 0, 65535,PUIG SOBIRA                             , 0, 0, 0, 5499\n  38,B38C           ,  42.281777,   2.097875,44694.6700000,0, 1, 3, 0, 65535,LA COVIL                                , 0, 0, 0, 6578\n  39,B39C           ,  42.153359,   1.465628,44694.6700000,0, 1, 3, 0, 65535,CAMPELLES                               , 0, 0, 0, 6411\n  40,B40C           ,  42.256447,   2.136963,44694.6700000,0, 1, 3, 0, 65535,EL CUAS                                 , 0, 0, 0, 4626\n  41,B41C           ,  42.059265,   2.192558,44694.6700000,0, 1, 3, 0, 65535,ST SALVADOR BELLVER                     , 0, 0, 0, 3133\n  42,B42C           ,  42.081987,   2.197633,44694.6700000,0, 1, 3, 0, 65535,SERRA BESCANO                           , 0, 0, 0, 2877\n  43,B43C           ,  42.195925,   2.195684,44694.6700000,0, 1, 3, 0, 65535,RIPOLL                                  , 0, 0, 0, 2231\n  44,B44C           ,  42.240287,   2.192788,44694.6700000,0, 1, 3, 0, 65535,PUIG DEL RAM                            , 0, 0, 0, 3609\n  45,B45C           ,  42.391891,   1.686799,44694.6700000,0, 1, 3, 0, 65535,LLES DE CERDANYA                        , 0, 0, 0, 4849\n  46,B46C           ,  42.199179,   2.241305,44694.6700000,0, 1, 3, 0, 65535,TURO FOSSES                             , 0, 0, 0, 3445\n  47,B47C           ,  42.304283,   2.168767,44694.6700000,0, 1, 3, 0, 65535,RIBES FRESER                            , 0, 0, 0, 3038\n  48,B48C           ,  42.136050,   1.385024,44694.6700000,0, 1, 3, 0, 65535,CAMBRILS                                , 0, 0, 0, 3914\n  49,B49C           ,  42.280776,   2.209851,44694.6700000,0, 1, 3, 0, 65535,TAGA                                    , 0, 0, 0, 6693\n  50,B50C           ,  42.445973,   1.787237,44694.6700000,0, 1, 3, 0, 65535,MERANGES                                , 0, 0, 0, 4997\n  51,B51C           ,  42.165479,   2.289306,44694.6700000,0, 1, 3, 0, 65535,MILANY                                  , 0, 0, 0, 5007\n  52,B52C           ,  42.284256,   2.253388,44694.6700000,0, 1, 3, 0, 65535,SERRA CAVALLERA                         , 0, 0, 0, 6604\n  53,B53C           ,  42.402503,   1.543112,44694.6700000,0, 1, 3, 0, 65535,BESCARAN                                , 0, 0, 0, 4301\n  54,B54C           ,  42.201653,   2.346865,44694.6700000,0, 1, 3, 0, 65535,PUIG ESTELA                             , 0, 0, 0, 4429\n  55,B55C           ,  42.372629,   1.357585,44694.6700000,0, 1, 3, 0, 65535,CASTELLBO                               , 0, 0, 0, 2795\n  56,D01C           ,  42.137850,   1.772733,44694.6700000,0, 1, 3, 0, 65535,RASOS PEGUERA                           , 0, 0, 0, 6604\n  57,D02C           ,  42.075174,   1.797814,44694.6700000,0, 1, 3, 0, 65535,2a MARIA                                , 0, 0, 0, 3445\n  58,D03C           ,  42.121450,   1.823983,44694.6700000,0, 1, 3, 0, 65535,FIGUERASSA                              , 0, 0, 0, 4767\n  59,D04C           ,  42.088808,   1.814073,44694.6700000,0, 1, 3, 0, 65535,1A MARIA                                , 0, 0, 0, 3235\n  60,D05C           ,  41.922490,   1.754520,44694.6700000,0, 1, 3, 0, 65535,SERRATEIX                               , 0, 0, 0, 2313\n  61,G01C           ,  42.084385,   1.822737,44694.6700000,0, 1, 3, 0, 65535,AVIA-FAC                                , 0, 0, 0, 2303\n  62,G02C           ,  42.255315,   1.857507,44694.6700000,0, 1, 3, 0, 65535,BAGA                                    , 0, 0, 0, 2772\n  63,G03C           ,  42.070004,   1.840553,44694.6700000,0, 1, 3, 0, 65535,CAMPING AVIA                            , 0, 0, 0, 2106\n  64,G04C           ,  42.015590,   2.031172,44694.6700000,0, 1, 3, 0, 65535,PRATS LLUCANES                          , 0, 0, 0, 2388\n  65,G05C           ,  42.013201,   1.832750,44694.6700000,0, 1, 3, 0, 65535,CASSERRES FUTBOL                        , 0, 0, 0, 2047\n  66,G06C           ,  42.077044,   2.290388,44694.6700000,0, 1, 3, 0, 65535,ST PERE TORELLO                         , 0, 0, 0, 2060\n  67,G07C           ,  42.209511,   1.331294,44694.6700000,0, 1, 3, 0, 65535,ORGANYA RIU                             , 0, 0, 0, 1729\n  68,G08C           ,  42.140357,   1.593002,44694.6700000,0, 1, 3, 0, 65535,ST LLORENC MORUNYS                      , 0, 0, 0, 2936\n  69,G09C           ,  42.017621,   1.735271,44694.6700000,0, 1, 3, 0, 65535,MONTMAJOR                               , 0, 0, 0, 2464\n  70,G10C           ,  41.997217,   1.526984,44694.6700000,0, 1, 3, 0, 65535,SOLSONA                                 , 0, 0, 0, 2201\n  71,G11C           ,  42.076859,   1.305483,44694.6700000,0, 1, 3, 0, 65535,OLIANA                                  , 0, 0, 0, 1506\n  72,G12C           ,  42.238500,   2.283560,44694.6700000,0, 1, 3, 0, 65535,ST JOAN ABADESSES                       , 0, 0, 0, 2454\n  73,G13C           ,  42.359547,   1.472457,44694.6700000,0, 1, 3, 0, 65535,LA SEU                                  , 0, 0, 0, 2254\n  74,G14C           ,  42.386459,   1.865099,43882.9100116,0, 1, 3, 0, 65535,ALP AERODROM                            , 0, 0, 0, 3520`,
+      boi: `OziExplorer Waypoint File Version 1.0\nWGS 84\nReserved 2\nReserved 3\n   1,B01B          ,  42.522314,   0.833831,46108.9459491,0, 1, 3, 0, 65535,BOI                                     , 0, 0, 0, 4177\n   2,B02B          ,  42.497867,   0.786219,46108.9459491,0, 1, 3, 0, 65535,CARDET                                  , 0, 0, 0, 3914\n   3,B03B          ,  42.512639,   0.489092,46108.9459491,0, 1, 3, 0, 65535,CASTEJON SOS                            , 0, 0, 0, 2953\n   4,B04B          ,  42.496761,   0.634817,46108.9459491,0, 1, 3, 0, 65535,DENUY                                   , 0, 0, 0, 4298\n   5,B05B          ,  42.499208,   0.821792,46108.9459491,0, 1, 3, 0, 65535,DURRO                                   , 0, 0, 0, 4606\n   6,B06B          ,  42.426106,   0.843392,46108.9459491,0, 1, 3, 0, 65535,ERTA                                    , 0, 0, 0, 4980\n   7,B07B          ,  42.386425,   0.868753,46108.9459491,0, 1, 3, 0, 65535,LES ESGLESIES                           , 0, 0, 0, 3369\n   8,B08B          ,  42.529567,   0.539086,46108.9459491,0, 1, 3, 0, 65535,PEDRAS BLANCAS                          , 0, 0, 0, 6562\n   9,B09B          ,  42.406661,   0.741211,46108.9459491,0, 1, 3, 0, 65535,PONT DE SUERT                           , 0, 0, 0, 2782\n  10,B10B          ,  42.517044,   0.848417,46108.9459491,0, 1, 3, 0, 65535,TAULL                                   , 0, 0, 0, 4790\n  11,B11B          ,  42.476036,   0.717222,46108.9459491,0, 1, 3, 0, 65535,VILALLER                                , 0, 0, 0, 3264\n  12,B12B          ,  42.359547,   1.472458,46108.9459491,0, 1, 3, 0, 65535,LA SEU                                  , 0, 0, 0, 2254\n  13,B13B          ,  42.421594,   0.982431,46108.9459491,0, 1, 3, 0, 65535,TORRE DE CAPDELLA                       , 0, 0, 0, 3543\n  14,B14B          ,  42.454169,   0.852811,46108.9459491,0, 1, 3, 0, 65535,CAP DELS VEDATS                         , 0, 0, 0, 8612\n  15,B15B          ,  42.631072,   0.656639,46108.9459491,0, 1, 3, 0, 65535,ANETO                                   , 0, 0, 0, 11168\n  16,B16B          ,  42.416917,   0.505300,46108.9459491,0, 1, 3, 0, 65535,TURBON                                  , 0, 0, 0, 8176\n  17,B17B          ,  42.309367,   0.740764,46108.9459491,0, 1, 3, 0, 65535,SOPEIRA                                 , 0, 0, 0, 2267\n  18,B18B          ,  42.400164,   1.131875,46108.9459491,0, 1, 3, 0, 65535,SORT                                    , 0, 0, 0, 2215\n  19,B19B          ,  42.445750,   0.791531,46108.9459491,0, 1, 3, 0, 65535,ESPERAN                                 , 0, 0, 0, 6568\n  20,B20B          ,  42.508739,   0.876411,46108.9459491,0, 1, 3, 0, 65535,TAULL CURVA W                           , 0, 0, 0, 5548\n  21,B21B          ,  42.525500,   0.825861,46108.9459491,0, 1, 3, 0, 65535,ERILL                                   , 0, 0, 0, 4072\n  22,B22B          ,  42.518611,   0.765431,46108.9459491,0, 1, 3, 0, 65535,TOSSAL ROIES                            , 0, 0, 0, 8005\n  23,B23B          ,  42.490069,   0.754961,46108.9459491,0, 1, 3, 0, 65535,CAP CANA                                , 0, 0, 0, 7182\n  24,B24B          ,  42.497789,   0.661839,46108.9459491,0, 1, 3, 0, 65535,CASTANESA                               , 0, 0, 0, 4915\n  25,B25B          ,  42.417369,   0.930400,46108.9459491,0, 1, 3, 0, 65535,PALES                                   , 0, 0, 0, 6903\n  26,B26B          ,  42.469311,   0.734361,46108.9459491,0, 1, 3, 0, 65535,SERRERES                                , 0, 0, 0, 4462\n  27,B27B          ,  42.408731,   1.214703,46108.9459491,0, 1, 3, 0, 65535,PIC DE L ORRI                           , 0, 0, 0, 7989\n  28,B28B          ,  42.411031,   1.044900,46108.9459491,0, 1, 3, 0, 65535,CAP MUNTANYETA                          , 0, 0, 0, 7257\n  29,B29B          ,  42.039814,   0.766533,46108.9459491,0, 1, 3, 0, 65535,ST ALIS                                 , 0, 0, 0, 5341\n  30,B30B          ,  42.017261,   0.745269,46108.9459491,0, 1, 3, 0, 65535,MACIAROL                                , 0, 0, 0, 2415\n  31,B31B          ,  42.031975,   0.701733,46108.9459491,0, 1, 3, 0, 65535,TORRE DELS MOROS                        , 0, 0, 0, 3320\n  32,B32B          ,  42.081458,   0.729433,46108.9459491,0, 1, 3, 0, 65535,ALSAMORA                                , 0, 0, 0, 2844\n  33,B34B          ,  41.978903,   0.750258,46108.9459491,0, 1, 3, 0, 65535,PORT AGER                               , 0, 0, 0, 3048\n  34,B35B          ,  42.051828,   0.655197,46108.9459491,0, 1, 3, 0, 65535,MONTFALCO                               , 0, 0, 0, 2477\n  35,B37B          ,  42.031600,   0.859714,46108.9459491,0, 1, 3, 0, 65535,PLA D ESCUMO                            , 0, 0, 0, 3189\n  36,B39B          ,  42.104994,   0.856592,46108.9459491,0, 1, 3, 0, 65535,CASTELL DE MUR                          , 0, 0, 0, 2881\n  37,B40B          ,  42.148758,   0.754172,46108.9459491,0, 1, 3, 0, 65535,TOSSAL GROS                             , 0, 0, 0, 3550\n  38,B41B          ,  42.095428,   0.618139,46108.9459491,0, 1, 3, 0, 65535,QUINTILLA                               , 0, 0, 0, 3451\n  39,B42B          ,  42.020614,   0.889311,46108.9459491,0, 1, 3, 0, 65535,PEDRERA MEIA                            , 0, 0, 0, 2799\n  40,B43B          ,  42.148764,   0.693228,46108.9459491,0, 1, 3, 0, 65535,PONT MONTANYANA                         , 0, 0, 0, 1795\n  41,B44B          ,  42.074542,   0.917042,46108.9459491,0, 1, 3, 0, 65535,LLIMIANA                                , 0, 0, 0, 2497\n  42,B45B          ,  41.977781,   0.940925,46108.9459491,0, 1, 3, 0, 65535,SANT MAMET                              , 0, 0, 0, 4491\n  43,B46B          ,  42.167261,   0.891100,46108.9459491,0, 1, 3, 0, 65535,TREMP ESTACIO                           , 0, 0, 0, 1539\n  44,B47B          ,  42.175267,   0.946175,46108.9459491,0, 1, 3, 0, 65535,ANT SUTERRANYA                          , 0, 0, 0, 2959\n  45,B48B          ,  42.002728,   1.018108,46108.9459491,0, 1, 3, 0, 65535,ERM DE MEIA                             , 0, 0, 0, 2867\n  46,B49B          ,  42.081153,   1.031228,46108.9459491,0, 1, 3, 0, 65535,ST SALVADOR                             , 0, 0, 0, 2612\n  47,B50B          ,  42.122078,   1.050828,46108.9459491,0, 1, 3, 0, 65535,ISONA                                   , 0, 0, 0, 2260\n  48,B51B          ,  42.214969,   1.021769,46108.9459491,0, 1, 3, 0, 65535,PESSONADA                               , 0, 0, 0, 2949\n  49,B52B          ,  42.161400,   1.091625,46108.9459491,0, 1, 3, 0, 65535,ABELLA CONCA                            , 0, 0, 0, 3123\n  50,B53B          ,  42.171222,   1.163183,46108.9459491,0, 1, 3, 0, 65535,BOIXOLS                                 , 0, 0, 0, 3806\n  51,B54B          ,  42.199464,   1.252417,46108.9459491,0, 1, 3, 0, 65535,MONTANISSELL                            , 0, 0, 0, 3711\n  52,B55B          ,  42.234719,   1.243447,46108.9459491,0, 1, 3, 0, 65535,ERM CABO                                , 0, 0, 0, 2533\n  53,B56B          ,  42.173878,   1.312678,46108.9459491,0, 1, 3, 0, 65535,COLL DE NARGO                           , 0, 0, 0, 1903\n  54,B57B          ,  42.209014,   1.301214,46108.9459491,0, 1, 3, 0, 65535,SANTA FE                                , 0, 0, 0, 3937\n  55,B58B          ,  42.475119,   0.545131,46108.9459491,0, 1, 3, 0, 65535,ANT COLL FADAS                          , 0, 0, 0, 5348\n  56,B59B          ,  42.102183,   1.364961,46108.9459491,0, 1, 3, 0, 65535,ROC DE LA MUA                           , 0, 0, 0, 3655\n  57,B60B          ,  42.242383,   1.311875,46108.9459491,0, 1, 3, 0, 65535,ORGANYA ANT                             , 0, 0, 0, 5348\n  58,B61B          ,  42.093022,   1.624267,46108.9459491,0, 1, 3, 0, 65535,BUSA ANT                                , 0, 0, 0, 4564\n  59,B62B          ,  42.239750,   1.702900,46108.9459491,0, 1, 3, 0, 65535,PEDRAFORCA SUP                          , 0, 0, 0, 7927\n  60,B63B          ,  42.137850,   1.772733,46108.9459491,0, 1, 3, 0, 65535,RASOS PEGUERA                           , 0, 0, 0, 6604\n  61,B64B          ,  42.157489,   0.812867,46108.9459491,0, 1, 3, 0, 65535,FIGOLS TREMP                            , 0, 0, 0, 2431\n  62,B65B          ,  42.419381,   0.132311,46108.9459491,0, 1, 3, 0, 65535,AINSA                                   , 0, 0, 0, 1959\n  63,B66B          ,  42.408519,   0.395431,46108.9459491,0, 1, 3, 0, 65535,CAMPO                                   , 0, 0, 0, 2257\n  64,B67B          ,  42.188000,   0.345700,46108.9459491,0, 1, 3, 0, 65535,GRAUS                                   , 0, 0, 0, 1490\n  65,B68B          ,  42.512775,   0.503108,46108.9459491,0, 1, 3, 0, 65535,ASERRADERO                              , 0, 0, 0, 3179\n  66,B69B          ,  42.501597,   0.473336,46108.9459491,0, 1, 3, 0, 65535,EMBOTELLADORA RUN                       , 0, 0, 0, 2887\n  67,B70B          ,  42.495272,   0.509828,46108.9459491,0, 1, 3, 0, 65535,BISAURRI                                , 0, 0, 0, 3573\n  68,B71B          ,  42.538031,   0.482314,46108.9459491,0, 1, 3, 0, 65535,IGLESIA DE SOS                          , 0, 0, 0, 3839\n  69,B72B          ,  42.482497,   0.489372,46108.9459491,0, 1, 3, 0, 65535,IGLESIA DE GABAS                        , 0, 0, 0, 4134\n  70,B73B          ,  42.555294,   0.544189,46108.9459491,0, 1, 3, 0, 65535,ANTENA P-COGULLA                        , 0, 0, 0, 7808\n  71,B74B          ,  42.577614,   0.466244,46108.9459491,0, 1, 3, 0, 65535,IGLESIA DE SAHUN                        , 0, 0, 0, 3675\n  72,B75B          ,  42.501836,   0.604006,46108.9459491,0, 1, 3, 0, 65535,ESPOLON BASIBE                          , 0, 0, 0, 6096\n  73,B76B          ,  42.470200,   0.598814,46108.9459491,0, 1, 3, 0, 65535,IGLESIA LAS PAULES                      , 0, 0, 0, 4921\n  74,B77B          ,  42.605347,   0.523817,46108.9459491,0, 1, 3, 0, 65535,IGLESIA DE BENASQUE                     , 0, 0, 0, 3707\n  75,B78B          ,  42.447703,   0.587478,46108.9459491,0, 1, 3, 0, 65535,IGLESIA ESPES DALT                      , 0, 0, 0, 4692\n  76,B79B          ,  42.496758,   0.634817,46108.9459491,0, 1, 3, 0, 65535,IGLESIA DE DENUY                        , 0, 0, 0, 4298\n  77,B80B          ,  42.463728,   0.624311,46108.9459491,0, 1, 3, 0, 65535,COLL D-ESPINA                           , 0, 0, 0, 4469\n  78,B81B          ,  42.406911,   0.439922,46108.9459491,0, 1, 3, 0, 65535,AGUASCALDES                             , 0, 0, 0, 2503\n  79,B82B          ,  42.385886,   0.494928,46108.9459491,0, 1, 3, 0, 65535,IGLESIA DE SERRATE                      , 0, 0, 0, 3937\n  80,B83B          ,  42.434656,   0.627672,46108.9459491,0, 1, 3, 0, 65535,IGLESIA DE ALINS                        , 0, 0, 0, 4560\n  81,B84B          ,  42.591064,   0.333689,46108.9459491,0, 1, 3, 0, 65535,IGLESIA DE GISTAIN                      , 0, 0, 0, 4659\n  82,B85B          ,  42.458194,   0.662647,46108.9459491,0, 1, 3, 0, 65535,IGLESIA NOALES                          , 0, 0, 0, 3281\n  83,B86B          ,  42.410108,   0.350706,46108.9459491,0, 1, 3, 0, 65535,IGLESIA DE FORADADA                     , 0, 0, 0, 3215\n  84,B87B          ,  42.426861,   0.667325,46108.9459491,0, 1, 3, 0, 65535,IGLESIA BONANSA                         , 0, 0, 0, 4101\n  85,B88B          ,  42.495647,   0.713103,46108.9459491,0, 1, 3, 0, 65535,CASA AISLADA GINASTE                    , 0, 0, 0, 3281\n  86,B89B          ,  42.358931,   0.606869,46108.9459491,0, 1, 3, 0, 65535,MIRADOR BERANUY                         , 0, 0, 0, 4862\n  87,B90B          ,  42.319250,   0.573781,46108.9459491,0, 1, 3, 0, 65535,PUENTE SERRADUY                         , 0, 0, 0, 2493\n  88,B91B          ,  42.634997,   0.218625,46108.9459491,0, 1, 3, 0, 65535,BIELSA                                  , 0, 0, 0, 3360\n  89,B92B          ,  42.423581,   0.855225,46108.9459491,0, 1, 3, 0, 65535,TOSSAL COGOMAR                          , 0, 0, 0, 6355\n  90,B93B          ,  42.314386,   0.846442,46108.9459491,0, 1, 3, 0, 65535,LA CREU DE FERRI                        , 0, 0, 0, 5292\n  91,B94B          ,  42.254267,   0.789769,46108.9459491,0, 1, 3, 0, 65535,ERMITA SAPEIRA                          , 0, 0, 0, 3346\n  92,B95B          ,  42.663478,   0.983319,46108.9459491,0, 1, 3, 0, 65535,PORT-BONAIGUA                           , 0, 0, 0, 6798\n  93,B96B          ,  42.732778,   0.966389,46108.9459491,0, 1, 3, 0, 65535,PLA DE BERET                            , 0, 0, 0, 6102\n  94,B97B          ,  42.490189,   0.199469,46108.9459491,0, 1, 3, 0, 65535,PENYA MONTANYESA                        , 0, 0, 0, 7398\n  95,D01B          ,  42.491519,   0.855561,46108.9459491,0, 1, 3, 0, 65535,PUIFALCONS                              , 0, 0, 0, 6719\n  96,D02B          ,  42.533772,   0.552131,46108.9459491,0, 1, 3, 0, 65535,DESPEGUE DE LIRI                        , 0, 0, 0, 7349\n  97,D03B          ,  42.473244,   0.859742,46108.9459491,0, 1, 3, 0, 65535,VAQUES                                  , 0, 0, 0, 7644\n  98,D04B          ,  42.477053,   0.889167,46108.9459491,0, 1, 3, 0, 65535,RASPES ROIES                            , 0, 0, 0, 9035\n  99,D05B          ,  42.524111,   0.851781,46108.9459491,0, 1, 3, 0, 65535,TAULL DESPEGUE                          , 0, 0, 0, 5830\n 100,D06B          ,  42.046344,   0.745992,46108.9459491,0, 1, 3, 0, 65535,COLL D ARES                             , 0, 0, 0, 5118\n 101,D07B          ,  42.524183,   0.499669,46108.9459491,0, 1, 3, 0, 65535,DESPEGUE NUEVO RIALS                    , 0, 0, 0, 4587\n 102,D08B          ,  42.439975,   0.408472,46108.9459491,0, 1, 3, 0, 65535,DESPEGUE CERVIN                         , 0, 0, 0, 5249\n 103,D09B          ,  42.341142,   0.639775,46108.9459491,0, 1, 3, 0, 65535,DESPEGUE CAP DE LA PALA                 , 0, 0, 0, 5820\n 104,D10B          ,  42.436064,   0.782475,46108.9459491,0, 1, 3, 0, 65535,DESPEGUE GOTARTA                        , 0, 0, 0, 5397\n 105,G01B          ,  42.501944,   0.798258,46108.9459491,0, 1, 3, 0, 65535,BARRUERA                                , 0, 0, 0, 3563\n 106,G02B          ,  42.519936,   0.488797,46108.9459491,0, 1, 3, 0, 65535,EL RAL                                  , 0, 0, 0, 2986\n 107,G03B          ,  42.245597,   0.965578,46108.9459491,0, 1, 3, 0, 65535,POBLA SEGUR                             , 0, 0, 0, 1693\n 108,G04B          ,  42.237347,   0.718131,46108.9459491,0, 1, 3, 0, 65535,AREN AERODROM                           , 0, 0, 0, 2034\n 109,G05B          ,  42.222239,   0.974361,46108.9459491,0, 1, 3, 0, 65535,CHIRINGUITO                             , 0, 0, 0, 1660\n 110,G06B          ,  42.379336,   0.179042,46108.9459491,0, 1, 3, 0, 65535,AERODROMO GERBE                         , 0, 0, 0, 1804\n 111,G07B          ,  42.076858,   1.305483,46108.9459491,0, 1, 3, 0, 65535,OLIANA                                  , 0, 0, 0, 1506\n 112,G08B          ,  42.209511,   1.331294,46108.9459491,0, 1, 3, 0, 65535,ORGANYA RIU                             , 0, 0, 0, 1729\n 113,G09B          ,  42.386458,   1.865100,46108.9459491,0, 1, 3, 0, 65535,ALP AERODROM                            , 0, 0, 0, 3520\n 114,G10B          ,  42.141450,   0.931239,46108.9459491,0, 1, 3, 0, 65535,VILAMITJANA                             , 0, 0, 0, 1493\n 115,G11B          ,  42.003800,   0.766578,46108.9459491,0, 1, 3, 0, 65535,CAMPING AGER                            , 0, 0, 0, 1975\n 116,G12B          ,  42.251686,   0.727256,46108.9459491,0, 1, 3, 0, 65535,AREN                                    , 0, 0, 0, 2110`,
+      bellmunt: `OziExplorer Waypoint File Version 1.0\nWGS 84\nReserved 2\nReserved 3\n   1,B01D           ,  42.125187,   2.387843,39589.90758, 0, 1, 3,         0,     65535,PUIGSACALM                              , 0, 0,    0, 4872,6,0,17\n   2,B02D           ,  42.073585,   2.265583,39589.90758, 0, 1, 3,         0,     65535,CAST TORELLO                            , 0, 0,    0, 2264,6,0,17\n   3,B03D           ,  42.075807,   2.407152,39589.90758, 0, 1, 3,         0,     65535,CABRERA                                 , 0, 0,    0, 4285,6,0,17\n   4,B04D           ,  42.109170,   2.349439,39589.90758, 0, 1, 3,         0,     65535,PUIG DE L ALIGA                         , 0, 0,    0, 4265,6,0,17\n   5,B05D           ,  42.091253,   2.328131,39589.90758, 0, 1, 3,         0,     65535,EL CASTELL                              , 0, 0,    0, 2674,6,0,17\n   6,B06D           ,  42.021068,   2.536282,39589.90758, 0, 1, 3,         0,     65535,EL FAR                                  , 0, 0,    0, 3415,6,0,17\n   7,B07D           ,  42.092581,   2.256115,39589.90758, 0, 1, 3,         0,     65535,BELLMUNT W                              , 0, 0,    0, 2933,6,0,17\n   8,B08D           ,  42.152436,   2.463184,39589.90758, 0, 1, 3,         0,     65535,LES PRESES                              , 0, 0,    0, 1503,6,0,17\n   9,B09D           ,  42.231441,   2.497498,39589.90758, 0, 1, 3,         0,     65535,PUIG CAU                                , 0, 0,    0, 2703,6,0,17\n  10,B10D           ,  42.081987,   2.197633,39589.90758, 0, 1, 3,         0,     65535,SERRA BESCANO                           , 0, 0,    0, 2877,6,0,17\n  11,B11D           ,  42.141717,   2.541533,39589.90758, 0, 1, 3,         0,     65535,STA MARGARIDA                           , 0, 0,    0, 2264,6,0,17\n  12,B12D           ,  42.281777,   2.097875,39589.90758, 0, 1, 3,         0,     65535,LA COVIL                                , 0, 0,    0, 6578,6,0,17\n  13,B13D           ,  41.999997,   2.269266,39589.90758, 0, 1, 3,         0,     65535,ESTACIO MANLLEU                         , 0, 0,    0, 1516,6,0,17\n  14,B14D           ,  42.280776,   2.209851,39589.90758, 0, 1, 3,         0,     65535,TAGA                                    , 0, 0,    0, 6693,6,0,17\n  15,B15D           ,  42.041348,   2.286210,39589.90758, 0, 1, 3,         0,     65535,ROTONDA C-37                            , 0, 0,    0, 1900,6,0,17\n  16,B16D           ,  42.018230,   2.335942,39589.90758, 0, 1, 3,         0,     65535,CRUILLA                                 , 0, 0,    0, 1542,6,0,17\n  17,B17D           ,  42.286960,   1.584431,39589.90758, 0, 1, 3,         0,     65535,TORRETA CADI                            , 0, 0,    0, 8406,6,0,17\n  18,B18D           ,  42.016986,   2.661846,39589.90758, 0, 1, 3,         0,     65535,ST ROC                                  , 0, 0,    0, 1903,6,0,17\n  19,B19D           ,  42.242383,   1.311874,39589.90758, 0, 1, 3,         0,     65535,ORGANYA ANT                             , 0, 0,    0, 5348,6,0,17\n  20,B20D           ,  42.303900,   1.922400,39589.90758, 0, 1, 3,         0,     65535,COLL DE PAL                             , 0, 0,    0, 6903,6,0,17\n  21,D01D           ,  42.099823,   2.293552,39589.90758, 0, 1, 3,         0,     65535,BELLMUNT                                , 0, 0,    0, 3783,6,0,17\n  22,G01D           ,  42.077044,   2.290388,39589.90758, 0, 1, 3,         0,     65535,ST PERE TORELLO                         , 0, 0,    0, 2060,6,0,17\n  23,G02D           ,  42.073287,   2.303165,39589.90758, 0, 1, 3,         0,     65535,ST PERE SKATING                         , 0, 0,    0, 1873,6,0,17\n  24,G03D           ,  42.015590,   2.031172,39589.90758, 0, 1, 3,         0,     65535,PRATS LLUCANES                          , 0, 0,    0, 2388,6,0,17\n  25,G04D           ,  42.074769,   1.812712,39589.90758, 0, 1, 3,         0,     65535,AVIA_NOU                                , 0, 0,    0, 2333,6,0,17\n  26,G05D           ,  42.359547,   1.472457,39589.90758, 0, 1, 3,         0,     65535,LA SEU                                  , 0, 0,    0, 2254,6,0,17\n  27,G06D           ,  42.014858,   2.606657,39589.90758, 0, 1, 3,         0,     65535,STA BRIGIDA                             , 0, 0,    0,  722,6,0,17\n  28,G07D           ,  42.224958,   2.435955,39589.90758, 0, 1, 3,         0,     65535,BIANYA                                  , 0, 0,    0, 1312,6,0,17\n  29,G08D           ,  42.428313,   1.931920,39589.90758, 0, 1, 3,         0,     65535,PUIGCERDA                               , 0, 0,    0, 3757,6,0,17\n  30,G09D           ,  42.227281,   2.257783,39589.90758, 0, 1, 3,         0,     65535,ST JOAN ABADESSES                       , 0, 0,    0, 2454,6,0,17\n  31,G10D           ,  42.209511,   1.331294,39589.90758, 0, 1, 3,         0,     65535,ORGANYA RIU                             , 0, 0,    0, 1729,6,0,17\n  32,G11D           ,  42.266917,   2.372038,39589.90758, 0, 1, 3,         0,     65535,SEGURIES                                , 0, 0,    0, 2959,6,0,17\n  33,G12D           ,  41.893886,   2.244207,39589.90758, 0, 1, 3,         0,     65535,MALLA                                   , 0, 0,    0, 1690,6,0,17\n  34,G13D           ,  42.210450,   2.451680,39589.90758, 0, 1, 3,         0,     65535,HOSTALNOU BIANYA                        , 0, 0,    0, 1194,6,0,17`
+    };
+
+    const takeoffRules = {
+      ager: 'D01A',
+      berga: 'D03C',
+      boi: 'D01B',
+      bellmunt: 'D01D'
+    };
+
+    let waypoints = [];
+    let taskTurnpoints = []; 
+    let draggedIndex = null;
+    let activeTaskCode = null;
+
+    let markersGroup = L.layerGroup().addTo(map);
+    let taskLayerGroup = L.layerGroup().addTo(map);
+
+    function updateTaskCodeUI(code) {
+      activeTaskCode = code;
+      const displayEl = document.getElementById('currentTaskCodeDisplay');
+      if (displayEl) {
+        displayEl.innerText = code ? code.toUpperCase() : '----';
+      }
+    }
+
+    function loadPreloadedZone() {
+      const select = document.getElementById('preloadedSelect');
+      const zoneKey = select.value;
+      if (!zoneKey || !preloadedZones[zoneKey]) return;
+
+      document.getElementById('fileInput').value = '';
+      updateTaskCodeUI(null);
+      parseWPT(preloadedZones[zoneKey], zoneKey);
+    }
+
+    document.getElementById('fileInput').addEventListener('change', function(e) {
+      const file = e.target.files[0];
+      if (!file) return;
+
+      document.getElementById('preloadedSelect').value = '';
+      updateTaskCodeUI(null);
+      const reader = new FileReader();
+      reader.onload = function(event) {
+        parseWPT(event.target.result, null);
+      };
+      reader.readAsText(file);
+    });
+
+    function parseWPT(text, zoneKey) {
+      const lines = text.split('\n');
+      waypoints = [];
+      taskTurnpoints = [];
+      markersGroup.clearLayers();
+      taskLayerGroup.clearLayers();
+
+      lines.forEach(line => {
+        const parts = line.trim().split(',');
+        if (parts.length >= 15 && !isNaN(parseInt(parts[0]))) {
+          const wp = {
+            id: parts[0].trim(),
+            code: parts[1].trim(),
+            lat: parseFloat(parts[2]),
+            lng: parseFloat(parts[3]),
+            name: parts[10].trim(),
+            altitudeM: Math.round(parseFloat(parts[14]) * 0.3048)
+          };
+          waypoints.push(wp);
+        }
+      });
+
+      if (waypoints.length > 0) {
+        document.getElementById('fileStatus').innerHTML = `<b>${waypoints.length} punts carregats</b> amb èxit.`;
+        showAppSections();
+        
+        renderWaypointsOnMap();
+        populateDropdown();
+
+        if (zoneKey && takeoffRules[zoneKey]) {
+          const targetCode = takeoffRules[zoneKey];
+          const takeoffIndex = waypoints.findIndex(wp => wp.code === targetCode);
+          if (takeoffIndex !== -1) {
+            addTurnpoint(takeoffIndex, 100);
+          }
+        } else {
+          renderTaskSequence();
+        }
+      } else {
+        alert('No s\'han pogut llegir els waypoints del fitxer.');
+      }
+    }
+
+    function showAppSections() {
+      document.getElementById('taskControlSection').style.display = 'block';
+      document.getElementById('taskSequenceSection').style.display = 'block';
+      document.getElementById('metricsSection').style.display = 'block';
+      document.getElementById('exportSection').style.display = 'block';
+    }
+
+    async function fetchTaskFromCloud() {
+      const codeInput = document.getElementById('taskCodeInput');
+      const code = codeInput.value.trim().toLowerCase();
+
+      if (!code) {
+        alert("Si us plau, introdueix un codi de task vàlid.");
+        return;
+      }
+
+      const directUrl = `https://tools.xcontest.org/api/xctsk/load/${code}`;
+      const proxyUrl = `https://api.allorigins.win/raw?url=${encodeURIComponent(directUrl)}`;
+
+      try {
+        let response;
+        try {
+          response = await fetch(directUrl);
+          if (!response.ok) throw new Error();
+        } catch (e) {
+          response = await fetch(proxyUrl);
+        }
+
+        if (!response.ok) throw new Error("No s'ha trobat la màniga especificada a XContest.");
+
+        const taskData = await response.json();
+        if (!taskData || !taskData.turnpoints) throw new Error("El fitxer baixat no té una estructura XCTSK vàlida.");
+
+        loadTaskData(taskData, code);
+        codeInput.value = '';
+      } catch (err) {
+        console.error(err);
+        alert(`Error en baixar la màniga '${code}': ${err.message}`);
+      }
+    }
+
+    function loadTaskData(taskData, code) {
+      taskTurnpoints = [];
+      let addedDynamicCount = 0;
+
+      taskData.turnpoints.forEach(tp => {
+        const wptData = tp.waypoint || {};
+        const codeWpt = wptData.name || "TP";
+        
+        let existingIndex = waypoints.findIndex(w => w.code === codeWpt);
+
+        if (existingIndex === -1) {
+          const dynamicWpt = {
+            id: `DYN_${waypoints.length + 1}`,
+            code: codeWpt,
+            lat: parseFloat(wptData.lat),
+            lng: parseFloat(wptData.lon),
+            name: wptData.description || codeWpt,
+            altitudeM: Math.round(parseFloat(wptData.altSmoothed) || 0)
+          };
+          waypoints.push(dynamicWpt);
+          existingIndex = waypoints.length - 1;
+          addedDynamicCount++;
+        }
+
+        taskTurnpoints.push({
+          ...waypoints[existingIndex],
+          radius: tp.radius || 1000
+        });
+      });
+
+      updateTaskCodeUI(code);
+      showAppSections();
+
+      if (addedDynamicCount > 0) {
+        markersGroup.clearLayers();
+        renderWaypointsOnMap();
+        populateDropdown();
+      }
+
+      if (taskData.sss && taskData.sss.timeGates && taskData.sss.timeGates.length > 0) {
+        parseAndSetUTCTime('sssTime', taskData.sss.timeGates[0]);
+      }
+      if (taskData.goal && taskData.goal.deadline) {
+        parseAndSetUTCTime('taskDeadline', taskData.goal.deadline);
+      }
+
+      document.getElementById('fileStatus').innerHTML = `Màniga <b>${code.toUpperCase()}</b> carregada des del núvol (${taskTurnpoints.length} balises).`;
+      renderTaskSequence();
+
+      if (taskTurnpoints.length > 0) {
+        map.setView([taskTurnpoints[0].lat, taskTurnpoints[0].lng], 12);
+      }
+    }
+
+    function parseAndSetUTCTime(elementId, utcTimeString) {
+      try {
+        const timeParts = utcTimeString.replace('Z', '').split(':');
+        if (timeParts.length >= 2) {
+          const now = new Date();
+          now.setUTCHours(parseInt(timeParts[0]), parseInt(timeParts[1]), 0, 0);
+
+          const localHours = String(now.getHours()).padStart(2, '0');
+          const localMinutes = String(now.getMinutes()).padStart(2, '0');
+
+          document.getElementById(elementId).value = `${localHours}:${localMinutes}`;
+        }
+      } catch (e) {
+        console.warn("No s'ha pogut convertir l'horari UTC:", e);
+      }
+    }
+
+    function renderWaypointsOnMap() {
+      waypoints.forEach((wp, index) => {
+        const marker = L.circleMarker([wp.lat, wp.lng], {
+          radius: 5,
+          color: '#2563eb',
+          fillColor: '#60a5fa',
+          fillOpacity: 0.8,
+          weight: 1.5
+        });
+
+        marker.bindTooltip(`<b>${wp.code}</b> - ${wp.name} (${wp.altitudeM}m)`, {
+          permanent: false,
+          direction: 'top',
+          className: 'wpt-tooltip'
+        });
+
+        marker.on('click', () => {
+          addTurnpoint(index);
+        });
+
+        markersGroup.addLayer(marker);
+      });
+
+      if (waypoints.length > 0 && taskTurnpoints.length === 0) {
+        map.setView([waypoints[0].lat, waypoints[0].lng], 13);
+      }
+    }
+
+    function populateDropdown() {
+      const turnpointSelect = document.getElementById('turnpointSelect');
+      turnpointSelect.innerHTML = '';
+
+      waypoints.forEach((wp, index) => {
+        const optionText = `[${wp.code}] ${wp.name} (${wp.altitudeM}m)`;
+        const opt = new Option(optionText, index);
+        turnpointSelect.add(opt);
+      });
+    }
+
+    function addSelectedTurnpoint() {
+      const select = document.getElementById('turnpointSelect');
+      const index = parseInt(select.value);
+      if (!isNaN(index)) {
+        addTurnpoint(index);
+      }
+    }
+
+    function addTurnpoint(wpIndex, customRadius = null) {
+      const wp = waypoints[wpIndex];
+      let radiusToApply = customRadius;
+      if (radiusToApply === null) {
+        radiusToApply = taskTurnpoints.length === 0 ? 100 : 1000;
+      }
+      
+      taskTurnpoints.push({
+        ...wp,
+        radius: radiusToApply
+      });
+      renderTaskSequence();
+    }
+
+    function removeTurnpoint(taskIndex) {
+      taskTurnpoints.splice(taskIndex, 1);
+      renderTaskSequence();
+    }
+
+    function updateRadius(taskIndex, newRadius) {
+      let val = parseInt(newRadius);
+      if (isNaN(val) || val < 100) val = 100;
+      taskTurnpoints[taskIndex].radius = val;
+      renderTaskSequence();
+    }
+
+    /* Drag & Drop Llista Lateral */
+    function handleDragStart(e, index) {
+      draggedIndex = index;
+      e.target.classList.add('dragging');
+      e.dataTransfer.effectAllowed = 'move';
+    }
+
+    function handleDragOver(e) {
+      if (e.preventDefault) e.preventDefault();
+      e.dataTransfer.dropEffect = 'move';
+      return false;
+    }
+
+    function handleDragEnter(e) {
+      const item = e.target.closest('.task-item');
+      if (item) item.classList.add('drag-over');
+    }
+
+    function handleDragLeave(e) {
+      const item = e.target.closest('.task-item');
+      if (item) item.classList.remove('drag-over');
+    }
+
+    function handleDrop(e, targetIndex) {
+      if (e.stopPropagation) e.stopPropagation();
+      
+      if (draggedIndex !== null && draggedIndex !== targetIndex) {
+        const movedItem = taskTurnpoints.splice(draggedIndex, 1)[0];
+        taskTurnpoints.splice(targetIndex, 0, movedItem);
+        renderTaskSequence();
+      }
+      return false;
+    }
+
+    function handleDragEnd(e) {
+      e.target.classList.remove('dragging');
+      document.querySelectorAll('.task-item').forEach(el => el.classList.remove('drag-over'));
+      draggedIndex = null;
+    }
+
+    /* Funcions Geodèsiques */
+    function calcularRumbo(lat1, lon1, lat2, lon2) {
+      let dLon = (lon2 - lon1) * Math.PI / 180;
+      let rLat1 = lat1 * Math.PI / 180;
+      let rLat2 = lat2 * Math.PI / 180;
+      let y = Math.sin(dLon) * Math.cos(rLat2);
+      let x = Math.cos(rLat1) * Math.sin(rLat2) - Math.sin(rLat1) * Math.cos(rLat2) * Math.cos(dLon);
+      return Math.atan2(y, x);
+    }
+
+    function calcularPuntoInterseccion(lat, lon, radio, rumbo) {
+      let deltaLat = (radio * Math.cos(rumbo)) / 111111.0;
+      let deltaLon = (radio * Math.sin(rumbo)) / (111111.0 * Math.cos(lat * Math.PI / 180));
+      return [lat + deltaLat, lon + deltaLon];
+    }
+
+    function calcularDistanciaHaver(p1, p2) {
+      let R = 6371;
+      let dLat = (p2[0] - p1[0]) * Math.PI / 180;
+      let dLon = (p2[1] - p1[1]) * Math.PI / 180;
+      let a = Math.sin(dLat/2) * Math.sin(dLat/2) +
+              Math.cos(p1[0] * Math.PI / 180) * Math.cos(p2[0] * Math.PI / 180) *
+              Math.sin(dLon/2 || dLon/2) * Math.sin(dLon/2 || dLon/2);
+      let c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1-a));
+      return R * c;
+    }
+
+    function calculateOptimizedRoute(turnpoints) {
+      let numTps = turnpoints.length;
+      if (numTps === 0) return { optPoints: [], centerDist: "0.0", optDist: "0.0" };
+
+      let centros = turnpoints.map(tp => ({
+        lat: tp.lat,
+        lon: tp.lng,
+        radius: tp.radius
+      }));
+
+      let puntosOptimos = centros.map(c => [c.lat, c.lon]);
+
+      /* Bucle de convergència de 40 iteracions */
+      for (let iter = 0; iter < 40; iter++) {
+        for (let i = 0; i < numTps; i++) {
+          let latC = centros[i].lat;
+          let lonC = centros[i].lon;
+          let rad = centros[i].radius;
+
+          if (i === 0) {
+            if (numTps > 1) {
+              let sigPoint = puntosOptimos[1];
+              let rumbo = calcularRumbo(latC, lonC, sigPoint[0], sigPoint[1]);
+              puntosOptimos[0] = calcularPuntoInterseccion(latC, lonC, rad, rumbo);
+            } else {
+              puntosOptimos[0] = [latC, lonC];
+            }
+          } 
+          else if (i === numTps - 1) {
+            let antIdx = i - 1;
+            let esConcentrica = calcularDistanciaHaver([centros[antIdx].lat, centros[antIdx].lon], [latC, lonC]) < 0.001;
+
+            if (esConcentrica && antIdx > 0) {
+              let prevPoint = puntosOptimos[antIdx - 1] || [centros[antIdx - 1].lat, centros[antIdx - 1].lon];
+              let rumboEntrada = calcularRumbo(prevPoint[0], prevPoint[1], latC, lonC);
+              puntosOptimos[i] = calcularPuntoInterseccion(latC, lonC, rad, rumboEntrada + Math.PI);
+            } else {
+              while (antIdx > 0 && calcularDistanciaHaver(puntosOptimos[antIdx], [latC, lonC]) < 0.0001) antIdx--;
+              let rumboHaciaAtras = calcularRumbo(latC, lonC, puntosOptimos[antIdx][0], puntosOptimos[antIdx][1]);
+              puntosOptimos[i] = calcularPuntoInterseccion(latC, lonC, rad, rumboHaciaAtras);
+            }
+          } 
+          else {
+            let antPoint = puntosOptimos[i - 1];
+            let sigPoint = puntosOptimos[i + 1];
+
+            let esConcentricaConSiguiente = calcularDistanciaHaver([latC, lonC], [centros[i + 1].lat, centros[i + 1].lon]) < 0.001;
+
+            if (esConcentricaConSiguiente) {
+              let rumboEntrada = calcularRumbo(antPoint[0], antPoint[1], latC, lonC);
+              puntosOptimos[i] = calcularPuntoInterseccion(latC, lonC, rad, rumboEntrada + Math.PI);
+            } else {
+              let mejorPunto = puntosOptimos[i];
+              let menorDistancia = Infinity;
+
+              let candidatosAngulos = [];
+              const pasos = 36;
+              for (let a = 0; a < pasos; a++) {
+                candidatosAngulos.push((2 * Math.PI * a) / pasos);
+              }
+
+              candidatosAngulos.push(calcularRumbo(latC, lonC, antPoint[0], antPoint[1]));
+              candidatosAngulos.push(calcularRumbo(latC, lonC, sigPoint[0], sigPoint[1]));
+
+              let mejorAngulo = 0;
+              for (let angulo of candidatosAngulos) {
+                let candidato = calcularPuntoInterseccion(latC, lonC, rad, angulo);
+                let dist = calcularDistanciaHaver(antPoint, candidato) + calcularDistanciaHaver(candidato, sigPoint);
+
+                if (dist < menorDistancia) {
+                  menorDistancia = dist;
+                  mejorPunto = candidato;
+                  mejorAngulo = angulo;
+                }
+              }
+
+              const rangoRefinamiento = (15 * Math.PI) / 180;
+              const pasosFinos = 10;
+              for (let f = -pasosFinos; f <= pasosFinos; f++) {
+                let anguloFino = mejorAngulo + (f / pasosFinos) * rangoRefinamiento;
+                let candidato = calcularPuntoInterseccion(latC, lonC, rad, anguloFino);
+                let dist = calcularDistanciaHaver(antPoint, candidato) + calcularDistanciaHaver(candidato, sigPoint);
+
+                if (dist < menorDistancia) {
+                  menorDistancia = dist;
+                  mejorPunto = candidato;
+                }
+              }
+
+              puntosOptimos[i] = mejorPunto;
+            }
+          }
+        }
+      }
+
+      let optDist = 0;
+      let centerDist = 0;
+      for (let i = 1; i < numTps; i++) {
+        optDist += calcularDistanciaHaver(puntosOptimos[i-1], puntosOptimos[i]);
+        centerDist += calcularDistanciaHaver([centros[i-1].lat, centros[i-1].lon], [centros[i].lat, centros[i].lon]);
+      }
+
+      return {
+        optPoints: puntosOptimos,
+        centerDist: centerDist.toFixed(1),
+        optDist: optDist.toFixed(1)
+      };
+    }
+
+    function renderTaskSequence() {
+      const container = document.getElementById('taskContainer');
+      container.innerHTML = '';
+      taskLayerGroup.clearLayers();
+
+      if (taskTurnpoints.length === 0) {
+        container.innerHTML = '<p style="font-size:0.78rem; color:#64748b;">No hi ha punts a la màniga. Fes clic a una balisa del mapa o selecciona-la del desplegable.</p>';
+        document.getElementById('centerDistVal').innerText = '0.0 km';
+        document.getElementById('optDistVal').innerText = '0.0 km';
+        return;
+      }
+
+      const routeData = calculateOptimizedRoute(taskTurnpoints);
+      const lineCoordsCenter = [];
+
+      taskTurnpoints.forEach((tp, index) => {
+        let roleBadgeHtml = '<span class="role-badge role-tp"></span>';
+        
+        let circleColor = '#2563eb';
+        let circleFill = '#3b82f6';
+
+        if (index === 0) {
+          roleBadgeHtml = '<span class="role-badge role-takeoff">TAKEOFF</span>';
+          circleColor = '#dc2626';
+          circleFill = '#ef4444';
+        } else if (index === 1 && taskTurnpoints.length > 2) {
+          roleBadgeHtml = '<span class="role-badge role-sss">SSS</span>';
+          circleColor = '#16a34a';
+          circleFill = '#22c55e';
+        } else if (index === taskTurnpoints.length - 2 && taskTurnpoints.length > 3) {
+          roleBadgeHtml = '<span class="role-badge role-ess">ESS</span>';
+          circleColor = '#ea580c';
+          circleFill = '#f97316';
+        } else if (index === taskTurnpoints.length - 1) {
+          roleBadgeHtml = '<span class="role-badge role-goal">GOAL</span>';
+          circleColor = '#dc2626';
+          circleFill = '#ef4444';
+        }
+
+        const item = document.createElement('div');
+        item.className = 'task-item';
+        item.setAttribute('draggable', 'true');
+
+        item.addEventListener('dragstart', (e) => handleDragStart(e, index));
+        item.addEventListener('dragover', handleDragOver);
+        item.addEventListener('dragenter', handleDragEnter);
+        item.addEventListener('dragleave', handleDragLeave);
+        item.addEventListener('drop', (e) => handleDrop(e, index));
+        item.addEventListener('dragend', handleDragEnd);
+
+        item.innerHTML = `
+          <span class="tp-handle">☰</span>
+          <span class="tp-num">TP ${index + 1}</span>
+          <span class="tp-code">[${tp.code}]</span>
+          <span class="tp-name" title="${tp.name}">${tp.name}</span>
+          ${roleBadgeHtml}
+          <div class="radius-compact-container">
+            <input type="number" id="radiusInput_${index}" class="radius-compact-input" value="${tp.radius}" step="100" min="100" onchange="updateRadius(${index}, this.value)">
+            <span class="radius-unit">m</span>
+          </div>
+          <button class="btn-remove-compact" onclick="removeTurnpoint(${index})">✕</button>
+        `;
+        
+        container.appendChild(item);
+
+        const circle = L.circle([tp.lat, tp.lng], {
+          radius: tp.radius,
+          color: circleColor,
+          fillColor: circleFill,
+          fillOpacity: 0.2,
+          interactive: false
+        });
+        taskLayerGroup.addLayer(circle);
+
+        /* ETIQUETA SOBRE EL MAPA CON # Y NOMBRE CORTO */
+        const labelIcon = L.divIcon({
+          className: 'wpt-task-label',
+          html: `<b>${index + 1}</b><br>${tp.code}`,
+          iconSize: [40, 24],
+          iconAnchor: [20, 12]
+        });
+        const labelMarker = L.marker([tp.lat, tp.lng], {
+          icon: labelIcon,
+          interactive: false
+        });
+        taskLayerGroup.addLayer(labelMarker);
+
+        const optPt = routeData.optPoints[index];
+        const bearingToOpt = (optPt) ? calcularRumbo(tp.lat, tp.lng, optPt[0], optPt[1]) : Math.PI / 2;
+        const handleCoords = calcularPuntoInterseccion(tp.lat, tp.lng, tp.radius, bearingToOpt);
+        
+        const handleIcon = L.divIcon({
+          className: 'radius-drag-handle',
+          iconSize: [12, 12],
+          iconAnchor: [6, 6]
+        });
+
+        const handleMarker = L.marker(handleCoords, {
+          icon: handleIcon,
+          draggable: true,
+          title: `Arrossegar per canviar el radi de ${tp.code}`
+        });
+
+        handleMarker.on('drag', (e) => {
+          const distKm = calcularDistanciaHaver([tp.lat, tp.lng], [e.latlng.lat, e.latlng.lng]);
+          const distMeters = distKm * 1000;
+          const roundedRadius = Math.max(100, Math.round(distMeters / 100) * 100);
+          
+          if (tp.radius !== roundedRadius) {
+            tp.radius = roundedRadius;
+            circle.setRadius(roundedRadius);
+            
+            const inputEl = document.getElementById(`radiusInput_${index}`);
+            if (inputEl) inputEl.value = roundedRadius;
+
+            const updatedRoute = calculateOptimizedRoute(taskTurnpoints);
+            document.getElementById('centerDistVal').innerText = `${updatedRoute.centerDist} km`;
+            document.getElementById('optDistVal').innerText = `${updatedRoute.optDist} km`;
+            
+            if (window.optLineLayer) {
+              window.optLineLayer.setLatLngs(updatedRoute.optPoints);
+            }
+          }
+        });
+
+        handleMarker.on('dragend', () => {
+          renderTaskSequence();
+        });
+
+        taskLayerGroup.addLayer(handleMarker);
+
+        lineCoordsCenter.push([tp.lat, tp.lng]);
+      });
+
+      document.getElementById('centerDistVal').innerText = `${routeData.centerDist} km`;
+      document.getElementById('optDistVal').innerText = `${routeData.optDist} km`;
+
+      if (lineCoordsCenter.length > 1) {
+        const centerLine = L.polyline(lineCoordsCenter, { 
+          color: '#94a3b8', 
+          weight: 2, 
+          dashArray: '4, 4',
+          interactive: false 
+        });
+        taskLayerGroup.addLayer(centerLine);
+      }
+
+      if (routeData.optPoints.length > 1) {
+        window.optLineLayer = L.polyline(routeData.optPoints, { 
+          color: '#7c3aed', 
+          weight: 3, 
+          interactive: false 
+        });
+        taskLayerGroup.addLayer(window.optLineLayer);
+      }
+    }
+
+    /* Formatea un valor HH:MM en hora local a formato ISO UTC Zulu (HH:MM:00Z) */
+    function formatXContestTime(timeStr) {
+      if (!timeStr) return "12:00:00Z";
+      
+      const [hours, minutes] = timeStr.split(':').map(Number);
+      const now = new Date();
+      
+      now.setHours(hours, minutes, 0, 0);
+
+      const utcHours = String(now.getUTCHours()).padStart(2, '0');
+      const utcMinutes = String(now.getUTCMinutes()).padStart(2, '0');
+
+      return `${utcHours}:${utcMinutes}:00Z`;
+    }
+
+    function buildXCTSKObject() {
+      const sssTime = document.getElementById('sssTime').value;
+      const taskDeadline = document.getElementById('taskDeadline').value;
+
+      return {
+        earthModel: "WGS84",
+        goal: {
+          deadline: formatXContestTime(taskDeadline),
+          type: "CYLINDER"
+        },
+        sss: {
+          direction: "EXIT",
+          timeGates: [formatXContestTime(sssTime)],
+          type: "RACE"
+        },
+        taskType: "CLASSIC",
+        turnpoints: taskTurnpoints.map((tp, idx) => {
+          const tpObj = {
+            radius: tp.radius
+          };
+
+          if (idx === 0) {
+            tpObj.type = "TAKEOFF";
+          } else if (idx === 1 && taskTurnpoints.length > 2) {
+            tpObj.type = "SSS";
+          } else if (idx === taskTurnpoints.length - 2 && taskTurnpoints.length > 3) {
+            tpObj.type = "ESS";
+          }
+
+          tpObj.waypoint = {
+            altSmoothed: tp.altitudeM,
+            description: tp.name,
+            lat: tp.lat,
+            lon: tp.lng,
+            name: tp.code
+          };
+
+          return tpObj;
+        }),
+        version: 1
+      };
+    }
+
+    function exportXCTSK() {
+      if (taskTurnpoints.length === 0) {
+        alert("Has d'afegir almenys una balisa per exportar la màniga.");
+        return;
+      }
+
+      const xctskData = buildXCTSKObject();
+      const jsonString = JSON.stringify(xctskData, null, 2);
+      const blob = new Blob([jsonString], { type: "application/json" });
+      const url = URL.createObjectURL(blob);
+      
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = `task_${new Date().toISOString().slice(0, 10)}.xctsk`;
+      document.body.appendChild(a);
+      a.click();
+      document.body.removeChild(a);
+      URL.revokeObjectURL(url);
+    }
+
+    async function openXContestTool() {
+      if (taskTurnpoints.length === 0) {
+        alert("Has d'afegir almenys una balisa per enviar la màniga a XContest.");
+        return;
+      }
+
+      const xctskData = buildXCTSKObject();
+      const jsonString = JSON.stringify(xctskData);
+
+      try {
+        const response = await fetch("https://tools.xcontest.org/api/xctsk/save", {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json"
+          },
+          body: jsonString
+        });
+
+        if (response.ok) {
+          const data = await response.json();
+          
+          if (data && data.taskCode) {
+            const code = data.taskCode.toUpperCase();
+            updateTaskCodeUI(code);
+            alert(`¡Màniga desada amb èxit a XContest!\n\nCodi assignat: ${code}`);
+            window.open(`https://tools.xcontest.org/xctsk/load?taskCode=${data.taskCode}`, '_blank');
+            return;
+          }
+        }
+        throw new Error("Resposta invàlida del servidor XContest.");
+
+      } catch (err) {
+        console.warn("Error en la connexió directa a l'API XContest:", err);
+        alert("No s'ha pogut connectar directament amb l'API REST. Es baixarà el fitxer .XCTSK per tal que el puguis pujar manualment.");
+        exportXCTSK();
+        window.open("https://tools.xcontest.org/xctsk", "_blank");
+      }
+    }
+  </script>
+</body>
+</html>
