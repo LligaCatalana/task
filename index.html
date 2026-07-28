@@ -2,27 +2,29 @@
 <html lang="ca">
 <head>
   <meta charset="UTF-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>Dissenyador de Tasques Parapent - XCTSK (v5.1)</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+  <title>Dissenyador de Tasques Paragliding - XCTSK (v5.4)</title>
   
   <!-- Leaflet CSS -->
   <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
   
   <style>
     * { box-sizing: border-box; margin: 0; padding: 0; }
-    body { font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; display: flex; height: 100vh; background: #f4f6f9; }
+    html, body { width: 100%; height: 100%; overflow: hidden; font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; display: flex; background: #f4f6f9; }
     
     #sidebar {
       width: 440px;
+      height: 100%;
       background: #ffffff;
       border-right: 1px solid #dcdfe6;
       display: flex;
       flex-direction: column;
-      z-index: 1000;
+      z-index: 2000;
       box-shadow: 2px 0 8px rgba(0,0,0,0.05);
+      transition: transform 0.3s ease, width 0.3s ease;
     }
 
-    .header { padding: 10px 12px; background: #1e293b; color: white; }
+    .header { padding: 10px 12px; background: #1e293b; color: white; display: flex; justify-content: space-between; align-items: center; }
     .header h1 { font-size: 1rem; font-weight: 600; }
 
     .content { padding: 8px; overflow-y: auto; flex: 1; }
@@ -54,7 +56,6 @@
       margin-bottom: 4px;
     }
 
-    /* FILAS COMPACTAS PARA CONTROLES */
     .compact-row {
       display: flex;
       gap: 6px;
@@ -142,7 +143,6 @@
       text-transform: uppercase;
     }
 
-    /* ESTILOS DE FILA ULTRA COMPACTA DE TASK */
     .task-item {
       background: #ffffff;
       border: 1px solid #cbd5e1;
@@ -210,7 +210,6 @@
     }
     .btn-remove-compact:hover { background: #fee2e2; }
 
-    /* ESTILOS DE HORARIOS Y EXPORTACIÓN */
     .time-grid {
       display: grid;
       grid-template-columns: 1fr 1fr;
@@ -244,7 +243,13 @@
       background: #15803d;
     }
 
-    #map { flex: 1; height: 100vh; }
+    #map {
+      flex: 1;
+      width: 100%;
+      height: 100%;
+      z-index: 1;
+      position: relative;
+    }
     
     .wpt-tooltip {
       background: rgba(15, 23, 42, 0.85);
@@ -273,32 +278,105 @@
     }
 
     .radius-drag-handle {
-      width: 12px;
-      height: 12px;
+      width: 14px;
+      height: 14px;
       background-color: #ea580c;
       border: 2px solid #ffffff;
       border-radius: 50%;
       box-shadow: 0 0 4px rgba(0,0,0,0.4);
       cursor: ew-resize;
     }
+
+    #sidebarToggle {
+      display: none;
+      position: absolute;
+      top: 10px;
+      right: 10px;
+      z-index: 3000;
+      background: #1e293b;
+      color: white;
+      border: none;
+      padding: 8px 12px;
+      border-radius: 6px;
+      font-weight: 600;
+      font-size: 0.85rem;
+      box-shadow: 0 2px 8px rgba(0,0,0,0.25);
+      cursor: pointer;
+    }
+
+    /* ADAPTACIÓ MÒBIL VERTICAL (PORTRAIT) */
+    @media (max-width: 768px) and (orientation: portrait) {
+      body { flex-direction: column; }
+      #sidebarToggle { display: block; }
+      
+      #sidebar {
+        width: 100%;
+        height: 55vh;
+        position: fixed;
+        bottom: 0;
+        left: 0;
+        border-right: none;
+        border-top: 2px solid #cbd5e1;
+        box-shadow: 0 -4px 12px rgba(0,0,0,0.2);
+      }
+
+      #sidebar.collapsed {
+        transform: translateY(calc(100% - 40px));
+      }
+
+      .header { cursor: pointer; }
+    }
+
+    /* ADAPTACIÓ MÒBIL HORITZONTAL (LANDSCAPE) */
+    @media (orientation: landscape) and (max-height: 550px) {
+      body { flex-direction: row; }
+      #sidebarToggle { display: none; }
+      
+      #sidebar {
+        width: 280px; /* Ample molt compac per deixar espai al mapa */
+        height: 100%;
+        position: relative;
+        bottom: auto;
+        left: auto;
+        transform: none !important;
+        border-right: 1px solid #cbd5e1;
+        border-top: none;
+        box-shadow: 2px 0 8px rgba(0,0,0,0.1);
+      }
+
+      .content { padding: 4px; }
+      .section { padding: 5px; margin-bottom: 4px; }
+      .section h3 { font-size: 0.7rem; margin-bottom: 4px; }
+      label { font-size: 0.7rem; }
+      select, input[type="file"], input[type="number"], input[type="text"], button {
+        font-size: 0.75rem;
+        padding: 2px 4px;
+        margin-bottom: 2px;
+      }
+      .task-item { padding: 2px 4px; font-size: 0.72rem; gap: 3px; }
+      .compact-row label { min-width: 55px; font-size: 0.68rem; }
+      .radius-compact-input { width: 48px !important; font-size: 0.72rem !important; }
+      .distance-card .val { font-size: 0.85rem; }
+    }
   </style>
 </head>
 <body>
 
+  <button id="sidebarToggle" onclick="toggleSidebarMobile()">📋 Màniga</button>
+
   <div id="sidebar">
-    <div class="header">
-      <h1>🪂 Dissenyador de Mànigues (XCTSK) v5.1</h1>
+    <div class="header" onclick="toggleSidebarMobile()">
+      <h1>🪂 Dissenyador de Mànigues (XCTSK) v5.4</h1>
     </div>
 
     <div class="content">
-      <!-- SECCIÓN 1: COMPACTADA -->
       <div class="section">
         <h3>1. Zona / Carregar Balises</h3>
         
         <div class="compact-row">
           <label for="preloadedSelect">Zona:</label>
           <select id="preloadedSelect" onchange="loadPreloadedZone()">
-            <option value="">-- Seleccionar Zona --</option>
+            <option value="">-- Seleccionar --</option>
             <option value="ager">AGER</option>
             <option value="berga">BERGA</option>
             <option value="boi">BOI</option>
@@ -312,22 +390,21 @@
         </div>
 
         <div class="compact-row">
-          <label for="taskCodeInput">Núvol (XContest):</label>
+          <label for="taskCodeInput">XContest:</label>
           <div class="input-group" style="flex:1;">
             <input type="text" id="taskCodeInput" placeholder="Ex: xono">
             <button class="btn-add" onclick="fetchTaskFromCloud()">📥 Carregar</button>
           </div>
         </div>
 
-        <div id="fileStatus" class="info-box">Tria una zona, carrega un fitxer WPT o baixa una màniga del núvol.</div>
+        <div id="fileStatus" class="info-box">Tria una zona, carrega WPT o baixa una màniga.</div>
       </div>
 
-      <!-- SECCIÓN 2: COMPACTADA -->
       <div class="section" id="taskControlSection" style="display: none;">
         <h3>2. Afegir Balises</h3>
         <div class="compact-row">
           <select id="turnpointSelect" style="flex:1;"></select>
-          <button class="btn-add" style="width: auto; padding: 4px 10px;" onclick="addSelectedTurnpoint()">➕ Afegir</button>
+          <button class="btn-add" style="width: auto; padding: 2px 8px;" onclick="addSelectedTurnpoint()">➕ Afegir</button>
         </div>
       </div>
 
@@ -354,24 +431,24 @@
         <h3>4. Horaris i Exportació</h3>
         
         <div class="task-code-badge" id="taskCodeDisplayBox">
-          <span class="lbl">Codi XContest Actiu:</span>
+          <span class="lbl">Codi Actiu:</span>
           <span class="val" id="currentTaskCodeDisplay">----</span>
         </div>
 
         <div class="time-grid">
           <div>
-            <label for="sssTime">Obertura SSS (Local):</label>
+            <label for="sssTime">SSS (Local):</label>
             <input type="time" id="sssTime" value="13:00">
           </div>
           <div>
-            <label for="taskDeadline">Tancament (Local):</label>
+            <label for="taskDeadline">Tancament:</label>
             <input type="time" id="taskDeadline" value="18:00">
           </div>
         </div>
 
-        <div class="time-grid" style="margin-top: 6px;">
-          <button class="btn-export" onclick="exportXCTSK()">💾 Descarregar .XCTSK</button>
-          <button class="btn-export" style="background: #0284c7;" onclick="openXContestTool()">🚀 Desar a XContest</button>
+        <div class="time-grid" style="margin-top: 4px;">
+          <button class="btn-export" onclick="exportXCTSK()">💾 .XCTSK</button>
+          <button class="btn-export" style="background: #0284c7;" onclick="openXContestTool()">🚀 XContest</button>
         </div>
       </div>
     </div>
@@ -383,7 +460,9 @@
   <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
 
   <script>
-    const map = L.map('map').setView([42.10, 1.80], 11);
+    const map = L.map('map', {
+      zoomControl: true
+    }).setView([42.10, 1.80], 11);
 
     const topoMap = L.tileLayer('https://{s}.tile.opentopomap.org/{z}/{x}/{y}.png', {
       maxZoom: 17,
@@ -398,6 +477,10 @@
       "OpenTopoMap (Relleu)": topoMap,
       "Esri Topo": esriWorldTopo
     }).addTo(map);
+
+    window.addEventListener('resize', () => { map.invalidateSize(); });
+    window.addEventListener('orientationchange', () => { setTimeout(() => map.invalidateSize(), 300); });
+    setTimeout(() => { map.invalidateSize(); }, 500);
 
     const preloadedZones = {
       ager: `OziExplorer Waypoint File Version 1.1\nWGS 84\nReserved 2\nReserved 3\n1,B01A,42.039810,0.766530,0,0,1,3,0,65535,ST ALIS,0,0,0,5341\n2,B02A,42.017260,0.745270,0,0,1,3,0,65535,MACIAROL,0,0,0,2415\n3,B03A,42.031980,0.701730,0,0,1,3,0,65535,TORRE DELS MOROS,0,0,0,3321\n4,B04A,42.081460,0.729430,0,0,1,3,0,65535,ALSAMORA,0,0,0,2844\n5,B05A,42.007150,0.720260,0,0,1,3,0,65535,AGULLO,0,0,0,2208\n6,B06A,41.997890,0.790830,0,0,1,3,0,65535,LA REGOLA,0,0,0,1683\n7,B07A,41.978900,0.750260,0,0,1,3,0,65535,PORT AGER,0,0,0,3048\n8,B08A,42.051830,0.655200,0,0,1,3,0,65535,MONTFALCO,0,0,0,2477\n9,B09A,42.013480,0.826030,0,0,1,3,0,65535,L AMETLLA,0,0,0,1877\n10,B10A,41.966460,0.756770,0,0,1,3,0,65535,FONTDEPOU,0,0,0,2710\n11,B11A,42.031600,0.859710,0,0,1,3,0,65535,PLA D ESCUMO,0,0,0,3189\n12,B12A,42.006560,0.851020,0,0,1,3,0,65535,ESTACIO AGER,0,0,0,1204\n13,B13A,42.105000,0.856590,0,0,1,3,0,65535,CASTELL DE MUR,0,0,0,2881\n14,B14A,42.148760,0.754170,0,0,1,3,0,65535,TOSSAL GROS,0,0,0,3550\n15,B15A,42.095430,0.618140,0,0,1,3,0,65535,QUINTILLA,0,0,0,3451\n16,B16A,42.020610,0.889310,0,0,1,3,0,65535,PEDRERA MEIA,0,0,0,2799\n17,B17A,42.148760,0.693230,0,0,1,3,0,65535,PONT MONTANYANA,0,0,0,1795\n18,B18A,42.074540,0.917040,0,0,1,3,0,65535,LLIMIANA,0,0,0,2497\n19,B19A,41.903950,0.764160,0,0,1,3,0,65535,LES AVELLANES,0,0,0,1955\n20,B20A,41.977780,0.940920,0,0,1,3,0,65535,SANT MAMET,0,0,0,4491\n21,B21A,42.167260,0.891100,0,0,1,3,0,65535,TREMP ESTACIO,0,0,0,1539\n22,B22A,42.175270,0.946180,0,0,1,3,0,65535,ANT SUTERRANYA,0,0,0,2959\n23,B23A,42.002730,1.018110,0,0,1,3,0,65535,ERM DE MEIA,0,0,0,2867\n24,B24A,42.081150,1.031230,0,0,1,3,0,65535,ST SALVADOR,0,0,0,2612\n25,B25A,42.122080,1.050830,0,0,1,3,0,65535,ISONA,0,0,0,2261\n26,B26A,42.309370,0.740760,0,0,1,3,0,65535,SOPEIRA,0,0,0,2267\n27,B27A,42.214970,1.021770,0,0,1,3,0,65535,PESSONADA,0,0,0,2951\n28,B28A,42.161400,1.091630,0,0,1,3,0,65535,ABELLA CONCA,0,0,0,3122\n29,B29A,42.171220,1.163180,0,0,1,3,0,65535,BOIXOLS,0,0,0,3806\n30,B30A,42.199460,1.252420,0,0,1,3,0,65535,MONTANISSELL,0,0,0,3711\n31,B31A,42.234720,1.243450,0,0,1,3,0,65535,ERM CABO,0,0,0,2533\n32,B32A,42.173880,1.312680,0,0,1,3,0,65535,COLL DE NARGO,0,0,0,1903\n33,B33A,42.209010,1.301220,0,0,1,3,0,65535,SANTA FE,0,0,0,3937\n34,B34A,42.475120,0.545130,0,0,1,3,0,65535,ANT COLL FADAS,0,0,0,5348\n35,B35A,42.497790,0.661840,0,0,1,3,0,65535,CASTANESA,0,0,0,4915\n36,B36A,42.102180,1.364960,0,0,1,3,0,65535,ROC DE LA MUA,0,0,0,3655\n37,B37A,42.242380,1.311870,0,0,1,3,0,65535,ORGANYA ANT,0,0,0,5348\n38,B38A,42.093020,1.624270,0,0,1,3,0,65535,BUSA ANT,0,0,0,4564\n39,B39A,42.239750,1.702900,0,0,1,3,0,65535,PEDRAFORCA SUP,0,0,0,7927\n40,B40A,42.137850,1.772730,0,0,1,3,0,65535,RASOS PEGUERA,0,0,0,6604\n41,B41A,42.107170,1.827520,0,0,1,3,0,65535,QUERALT,0,0,0,3612\n42,B42A,42.157490,0.812870,0,0,1,3,0,65535,FIGOLS TREMP,0,0,0,2431\n43,B43A,42.419380,0.132310,0,0,1,3,0,65535,AINSA,0,0,0,1959\n44,B44A,42.408520,0.395430,0,0,1,3,0,65535,CAMPO,0,0,0,2257\n45,B45A,42.188000,0.345700,0,0,1,3,0,65535,GRAUS,0,0,0,1490\n46,B46A,41.877680,0.559650,0,0,1,3,0,65535,ERM ST SALVADOR,0,0,0,2267\n47,B47A,41.914310,0.511690,0,0,1,3,0,65535,DESV CASTILLONROI,0,0,0,1978\n48,B48A,41.858130,0.850410,0,0,1,3,0,65535,MONTERO,0,0,0,1656\n49,D01A,42.046350,0.745990,0,0,1,3,0,65535,COLL D ARES,0,0,0,5118\n50,D02A,42.035710,0.735950,0,0,1,3,0,65535,LA NOVA,0,0,0,4032\n51,D03A,42.030330,0.765300,0,0,1,3,0,65535,GABRIELO,0,0,0,4242\n52,D04A,41.894440,0.532940,0,0,1,3,0,65535,CASTILLONROI,0,0,0,2106\n53,D05A,41.865800,0.818583,0,0,1,3,0,65535,SANTLLO,0,0,0,2060\n54,G01A,42.003800,0.766580,0,0,1,3,0,65535,CAMPING AGER,0,0,0,1975\n55,G02A,42.141450,0.931240,0,0,1,3,0,65535,VILAMITJANA,0,0,0,1492\n56,G03A,42.237350,0.718130,0,0,1,3,0,65535,AREN AERODROM,0,0,0,2034\n57,G06A,42.222240,0.974360,0,0,1,3,0,65535,CHIRINGUITO,0,0,0,1660\n58,G07A,41.796050,0.805720,0,0,1,3,0,65535,BALAGUER BOMBERS,0,0,0,876\n59,G08A,42.245600,0.965580,0,0,1,3,0,65535,POBLA SEGUR,0,0,0,1693\n60,G09A,41.920350,1.185700,0,0,1,3,0,65535,PONTS,0,0,0,1181\n61,G10A,42.076860,1.305480,0,0,1,3,0,65535,OLIANA,0,0,0,1506\n62,G11A,42.476040,0.717220,0,0,1,3,0,65535,VILALLER,0,0,0,3264\n63,G12A,42.400170,1.131880,0,0,1,3,0,65535,SORT,0,0,0,2215\n64,G13A,42.501950,0.798260,0,0,1,3,0,65535,BARRUERA,0,0,0,3563\n65,G14A,42.209510,1.331290,0,0,1,3,0,65535,ORGANYA RIU,0,0,0,1729\n66,G15A,42.512640,0.489090,0,0,1,3,0,65535,CASTEJON SOS,0,0,0,2953\n67,G16A,41.809480,1.395470,0,0,1,3,0,65535,TORA,0,0,0,1400\n68,G17A,42.359550,1.472460,0,0,1,3,0,65535,LA SEU,0,0,0,2254\n69,G18A,41.744770,1.557180,0,0,1,3,0,65535,CALAF,0,0,0,2354\n70,G19A,42.084390,1.822740,0,0,1,3,0,65535,AVIA-FAC,0,0,0,2303\n71,G20A,42.386460,1.865100,0,0,1,3,0,65535,ALP AERODROM,0,0,0,3520\n72,G21A,42.043520,2.259450,0,0,1,3,0,65535,TORELLO,0,0,0,1647\n73,G22A,41.991900,1.530720,0,0,1,3,0,65535,SOLSONA,0,0,0,2201\n74,G23A,41.988650,1.030140,0,0,1,3,0,65535,VVA DE MEIA,0,0,0,1883`,
@@ -420,6 +503,12 @@
 
     let markersGroup = L.layerGroup().addTo(map);
     let taskLayerGroup = L.layerGroup().addTo(map);
+
+    function toggleSidebarMobile() {
+      const sidebar = document.getElementById('sidebar');
+      sidebar.classList.toggle('collapsed');
+      setTimeout(() => { map.invalidateSize(); }, 300);
+    }
 
     function updateTaskCodeUI(code) {
       activeTaskCode = code;
@@ -680,7 +769,6 @@
       renderTaskSequence();
     }
 
-    /* Drag & Drop Llista Lateral */
     function handleDragStart(e, index) {
       draggedIndex = index;
       e.target.classList.add('dragging');
@@ -720,7 +808,6 @@
       draggedIndex = null;
     }
 
-    /* Funcions Geodèsiques */
     function calcularRumbo(lat1, lon1, lat2, lon2) {
       let dLon = (lon2 - lon1) * Math.PI / 180;
       let rLat1 = lat1 * Math.PI / 180;
@@ -759,7 +846,6 @@
 
       let puntosOptimos = centros.map(c => [c.lat, c.lon]);
 
-      /* Bucle de convergència de 40 iteracions */
       for (let iter = 0; iter < 40; iter++) {
         for (let i = 0; i < numTps; i++) {
           let latC = centros[i].lat;
@@ -930,7 +1016,6 @@
         });
         taskLayerGroup.addLayer(circle);
 
-        /* ETIQUETA SOBRE EL MAPA CON # Y NOMBRE CORTO */
         const labelIcon = L.divIcon({
           className: 'wpt-task-label',
           html: `<b>${index + 1}</b><br>${tp.code}`,
@@ -949,8 +1034,8 @@
         
         const handleIcon = L.divIcon({
           className: 'radius-drag-handle',
-          iconSize: [12, 12],
-          iconAnchor: [6, 6]
+          iconSize: [14, 14],
+          iconAnchor: [7, 7]
         });
 
         const handleMarker = L.marker(handleCoords, {
@@ -1013,7 +1098,6 @@
       }
     }
 
-    /* Formatea un valor HH:MM en hora local a formato ISO UTC Zulu (HH:MM:00Z) */
     function formatXContestTime(timeStr) {
       if (!timeStr) return "12:00:00Z";
       
