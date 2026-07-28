@@ -3,7 +3,7 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-  <title>Dissenyador de Tasques Paragliding - XCTSK (v5.4)</title>
+  <title>Dissenyador de Tasques Paragliding - XCTSK (v5.5)</title>
   
   <!-- Leaflet CSS -->
   <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
@@ -210,6 +210,50 @@
     }
     .btn-remove-compact:hover { background: #fee2e2; }
 
+    /* ESTILS DE MÀNIGUES DESADES (LOCALSTORAGE) */
+    .saved-task-item {
+      background: #ffffff;
+      border: 1px solid #cbd5e1;
+      border-radius: 4px;
+      padding: 4px 6px;
+      margin-bottom: 4px;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      font-size: 0.78rem;
+    }
+    .saved-task-info {
+      display: flex;
+      flex-direction: column;
+      overflow: hidden;
+      flex: 1;
+    }
+    .saved-task-name {
+      font-weight: 700;
+      color: #1e293b;
+      white-space: nowrap;
+      overflow: hidden;
+      text-overflow: ellipsis;
+    }
+    .saved-task-meta {
+      font-size: 0.68rem;
+      color: #64748b;
+    }
+    .saved-task-actions {
+      display: flex;
+      gap: 4px;
+    }
+    .btn-action-small {
+      width: auto !important;
+      padding: 2px 6px !important;
+      margin-bottom: 0 !important;
+      font-size: 0.72rem !important;
+      font-weight: 600;
+      border: none;
+      border-radius: 3px;
+      cursor: pointer;
+    }
+
     .time-grid {
       display: grid;
       grid-template-columns: 1fr 1fr;
@@ -304,7 +348,6 @@
       cursor: pointer;
     }
 
-    /* ADAPTACIÓ MÒBIL VERTICAL (PORTRAIT) */
     @media (max-width: 768px) and (orientation: portrait) {
       body { flex-direction: column; }
       #sidebarToggle { display: block; }
@@ -327,13 +370,12 @@
       .header { cursor: pointer; }
     }
 
-    /* ADAPTACIÓ MÒBIL HORITZONTAL (LANDSCAPE) */
     @media (orientation: landscape) and (max-height: 550px) {
       body { flex-direction: row; }
       #sidebarToggle { display: none; }
       
       #sidebar {
-        width: 280px; /* Ample molt compac per deixar espai al mapa */
+        width: 280px;
         height: 100%;
         position: relative;
         bottom: auto;
@@ -366,7 +408,7 @@
 
   <div id="sidebar">
     <div class="header" onclick="toggleSidebarMobile()">
-      <h1>🪂 Dissenyador de Mànigues (XCTSK) v5.4</h1>
+      <h1>🪂 Dissenyador de Mànigues (XCTSK) v5.5</h1>
     </div>
 
     <div class="content">
@@ -451,6 +493,16 @@
           <button class="btn-export" style="background: #0284c7;" onclick="openXContestTool()">🚀 XContest</button>
         </div>
       </div>
+
+      <!-- SECCIÓ 5: MÀNIGUES DESADES A NAVEGADOR -->
+      <div class="section" id="savedTasksSection" style="display: none;">
+        <h3>5. Mànigues Desades (Local)</h3>
+        <div class="compact-row">
+          <input type="text" id="saveTaskNameInput" placeholder="Nom de la màniga..." style="flex:1;">
+          <button class="btn-add" style="width: auto; padding: 3px 8px; background: #059669;" onclick="saveCurrentTaskLocal()">💾 Desa</button>
+        </div>
+        <div id="savedTasksList" style="margin-top: 6px;"></div>
+      </div>
     </div>
   </div>
 
@@ -503,6 +555,10 @@
 
     let markersGroup = L.layerGroup().addTo(map);
     let taskLayerGroup = L.layerGroup().addTo(map);
+
+    window.addEventListener('load', () => {
+      renderSavedTasks();
+    });
 
     function toggleSidebarMobile() {
       const sidebar = document.getElementById('sidebar');
@@ -589,6 +645,7 @@
       document.getElementById('taskSequenceSection').style.display = 'block';
       document.getElementById('metricsSection').style.display = 'block';
       document.getElementById('exportSection').style.display = 'block';
+      document.getElementById('savedTasksSection').style.display = 'block';
     }
 
     async function fetchTaskFromCloud() {
@@ -671,7 +728,7 @@
         parseAndSetUTCTime('taskDeadline', taskData.goal.deadline);
       }
 
-      document.getElementById('fileStatus').innerHTML = `Màniga <b>${code.toUpperCase()}</b> carregada des del núvol (${taskTurnpoints.length} balises).`;
+      document.getElementById('fileStatus').innerHTML = `Màniga <b>${code ? code.toUpperCase() : 'SENSE CODI'}</b> carregada des del núvol (${taskTurnpoints.length} balises).`;
       renderTaskSequence();
 
       if (taskTurnpoints.length > 0) {
@@ -1096,6 +1153,138 @@
         });
         taskLayerGroup.addLayer(window.optLineLayer);
       }
+    }
+
+    /* FUNCIONS PER A DESAR I CARREGAR A LOCALSTORAGE */
+    function saveCurrentTaskLocal() {
+      if (taskTurnpoints.length === 0) {
+        alert("Has d'afegir almenys una balisa per desar la màniga.");
+        return;
+      }
+
+      const inputEl = document.getElementById('saveTaskNameInput');
+      let name = inputEl.value.trim();
+      if (!name) {
+        name = `Màniga ${new Date().toLocaleDateString('ca-ES')} ${new Date().toLocaleTimeString('ca-ES', {hour:'2-digit', minute:'2-digit'})}`;
+      }
+
+      const savedTask = {
+        name: name,
+        date: new Date().toISOString(),
+        taskCode: activeTaskCode,
+        sssTime: document.getElementById('sssTime').value,
+        taskDeadline: document.getElementById('taskDeadline').value,
+        turnpoints: taskTurnpoints.map(tp => ({
+          code: tp.code,
+          name: tp.name,
+          lat: tp.lat,
+          lng: tp.lng,
+          altitudeM: tp.altitudeM,
+          radius: tp.radius
+        }))
+      };
+
+      let currentSaved = JSON.parse(localStorage.getItem('xctsk_saved_tasks') || '[]');
+      currentSaved.push(savedTask);
+      localStorage.setItem('xctsk_saved_tasks', JSON.stringify(currentSaved));
+
+      inputEl.value = '';
+      renderSavedTasks();
+      alert(`Màniga '${name}' desada localment!`);
+    }
+
+    function renderSavedTasks() {
+      const container = document.getElementById('savedTasksList');
+      if (!container) return;
+      container.innerHTML = '';
+
+      const savedTasks = JSON.parse(localStorage.getItem('xctsk_saved_tasks') || '[]');
+
+      if (savedTasks.length === 0) {
+        container.innerHTML = '<p style="font-size:0.72rem; color:#94a3b8; font-style:italic;">No hi ha mànigues desades localment.</p>';
+        return;
+      }
+
+      savedTasks.forEach((st, idx) => {
+        const item = document.createElement('div');
+        item.className = 'saved-task-item';
+
+        const numPoints = st.turnpoints ? st.turnpoints.length : 0;
+        const codeText = st.taskCode ? ` [${st.taskCode.toUpperCase()}]` : '';
+
+        item.innerHTML = `
+          <div class="saved-task-info">
+            <span class="saved-task-name" title="${st.name}">${st.name}${codeText}</span>
+            <span class="saved-task-meta">${numPoints} balises | SSS: ${st.sssTime || '--:--'}</span>
+          </div>
+          <div class="saved-task-actions">
+            <button class="btn-action-small" style="background:#2563eb; color:white;" onclick="loadSavedTaskLocal(${idx})">📂 Carregar</button>
+            <button class="btn-action-small" style="background:#fee2e2; color:#dc2626;" onclick="deleteSavedTaskLocal(${idx})">🗑️</button>
+          </div>
+        `;
+
+        container.appendChild(item);
+      });
+    }
+
+    function loadSavedTaskLocal(index) {
+      const savedTasks = JSON.parse(localStorage.getItem('xctsk_saved_tasks') || '[]');
+      const st = savedTasks[index];
+      if (!st) return;
+
+      taskTurnpoints = [];
+      let addedDynamicCount = 0;
+
+      st.turnpoints.forEach(tp => {
+        let existingIndex = waypoints.findIndex(w => w.code === tp.code);
+
+        if (existingIndex === -1) {
+          const dynamicWpt = {
+            id: `DYN_${waypoints.length + 1}`,
+            code: tp.code,
+            lat: parseFloat(tp.lat),
+            lng: parseFloat(tp.lng),
+            name: tp.name || tp.code,
+            altitudeM: Math.round(parseFloat(tp.altitudeM) || 0)
+          };
+          waypoints.push(dynamicWpt);
+          existingIndex = waypoints.length - 1;
+          addedDynamicCount++;
+        }
+
+        taskTurnpoints.push({
+          ...waypoints[existingIndex],
+          radius: tp.radius || 1000
+        });
+      });
+
+      if (st.sssTime) document.getElementById('sssTime').value = st.sssTime;
+      if (st.taskDeadline) document.getElementById('taskDeadline').value = st.taskDeadline;
+
+      updateTaskCodeUI(st.taskCode || null);
+      showAppSections();
+
+      if (addedDynamicCount > 0) {
+        markersGroup.clearLayers();
+        renderWaypointsOnMap();
+        populateDropdown();
+      }
+
+      document.getElementById('fileStatus').innerHTML = `Màniga desada <b>'${st.name}'</b> carregada.`;
+      renderTaskSequence();
+
+      if (taskTurnpoints.length > 0) {
+        map.setView([taskTurnpoints[0].lat, taskTurnpoints[0].lng], 12);
+      }
+    }
+
+    function deleteSavedTaskLocal(index) {
+      if (!confirm("Segur que vols eliminar aquesta màniga desada?")) return;
+
+      let savedTasks = JSON.parse(localStorage.getItem('xctsk_saved_tasks') || '[]');
+      savedTasks.splice(index, 1);
+      localStorage.setItem('xctsk_saved_tasks', JSON.stringify(savedTasks));
+      renderSavedTasks();
     }
 
     function formatXContestTime(timeStr) {
