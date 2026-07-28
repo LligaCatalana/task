@@ -3,7 +3,7 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-  <title>Dissenyador de Tasques Paragliding - XCTSK (v5.5)</title>
+  <title>Dissenyador de Tasques Paragliding - XCTSK (v5.7)</title>
   
   <!-- Leaflet CSS -->
   <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
@@ -210,7 +210,6 @@
     }
     .btn-remove-compact:hover { background: #fee2e2; }
 
-    /* ESTILS DE MÀNIGUES DESADES (LOCALSTORAGE) */
     .saved-task-item {
       background: #ffffff;
       border: 1px solid #cbd5e1;
@@ -408,7 +407,7 @@
 
   <div id="sidebar">
     <div class="header" onclick="toggleSidebarMobile()">
-      <h1>🪂 Dissenyador de Mànigues (XCTSK) v5.5</h1>
+      <h1>🪂 Dissenyador de Mànigues (XCTSK) v5.7</h1>
     </div>
 
     <div class="content">
@@ -494,7 +493,6 @@
         </div>
       </div>
 
-      <!-- SECCIÓ 5: MÀNIGUES DESADES A NAVEGADOR -->
       <div class="section" id="savedTasksSection" style="display: none;">
         <h3>5. Mànigues Desades (Local)</h3>
         <div class="compact-row">
@@ -891,6 +889,7 @@
       return R * c;
     }
 
+    /* ALGORITME DE CORDES DE GOMA / RUBBER BAND OPTIMIZATION (v5.7) */
     function calculateOptimizedRoute(turnpoints) {
       let numTps = turnpoints.length;
       if (numTps === 0) return { optPoints: [], centerDist: "0.0", optDist: "0.0" };
@@ -901,8 +900,10 @@
         radius: tp.radius
       }));
 
+      // Inicialitzar punts als centres
       let puntosOptimos = centros.map(c => [c.lat, c.lon]);
 
+      // Cicle de relaxació de cordes (40 passades sobre tota la ruta)
       for (let iter = 0; iter < 40; iter++) {
         for (let i = 0; i < numTps; i++) {
           let latC = centros[i].lat;
@@ -919,68 +920,53 @@
             }
           } 
           else if (i === numTps - 1) {
-            let antIdx = i - 1;
-            let esConcentrica = calcularDistanciaHaver([centros[antIdx].lat, centros[antIdx].lon], [latC, lonC]) < 0.001;
-
-            if (esConcentrica && antIdx > 0) {
-              let prevPoint = puntosOptimos[antIdx - 1] || [centros[antIdx - 1].lat, centros[antIdx - 1].lon];
-              let rumboEntrada = calcularRumbo(prevPoint[0], prevPoint[1], latC, lonC);
-              puntosOptimos[i] = calcularPuntoInterseccion(latC, lonC, rad, rumboEntrada + Math.PI);
-            } else {
-              while (antIdx > 0 && calcularDistanciaHaver(puntosOptimos[antIdx], [latC, lonC]) < 0.0001) antIdx--;
-              let rumboHaciaAtras = calcularRumbo(latC, lonC, puntosOptimos[antIdx][0], puntosOptimos[antIdx][1]);
-              puntosOptimos[i] = calcularPuntoInterseccion(latC, lonC, rad, rumboHaciaAtras);
-            }
+            let antPoint = puntosOptimos[i - 1];
+            let rumboHaciaAtras = calcularRumbo(latC, lonC, antPoint[0], antPoint[1]);
+            puntosOptimos[i] = calcularPuntoInterseccion(latC, lonC, rad, rumboHaciaAtras);
           } 
           else {
             let antPoint = puntosOptimos[i - 1];
             let sigPoint = puntosOptimos[i + 1];
 
-            let esConcentricaConSiguiente = calcularDistanciaHaver([latC, lonC], [centros[i + 1].lat, centros[i + 1].lon]) < 0.001;
+            let mejorPunto = puntosOptimos[i];
+            let menorDistancia = Infinity;
 
-            if (esConcentricaConSiguiente) {
-              let rumboEntrada = calcularRumbo(antPoint[0], antPoint[1], latC, lonC);
-              puntosOptimos[i] = calcularPuntoInterseccion(latC, lonC, rad, rumboEntrada + Math.PI);
-            } else {
-              let mejorPunto = puntosOptimos[i];
-              let menorDistancia = Infinity;
-
-              let candidatosAngulos = [];
-              const pasos = 36;
-              for (let a = 0; a < pasos; a++) {
-                candidatosAngulos.push((2 * Math.PI * a) / pasos);
-              }
-
-              candidatosAngulos.push(calcularRumbo(latC, lonC, antPoint[0], antPoint[1]));
-              candidatosAngulos.push(calcularRumbo(latC, lonC, sigPoint[0], sigPoint[1]));
-
-              let mejorAngulo = 0;
-              for (let angulo of candidatosAngulos) {
-                let candidato = calcularPuntoInterseccion(latC, lonC, rad, angulo);
-                let dist = calcularDistanciaHaver(antPoint, candidato) + calcularDistanciaHaver(candidato, sigPoint);
-
-                if (dist < menorDistancia) {
-                  menorDistancia = dist;
-                  mejorPunto = candidato;
-                  mejorAngulo = angulo;
-                }
-              }
-
-              const rangoRefinamiento = (15 * Math.PI) / 180;
-              const pasosFinos = 10;
-              for (let f = -pasosFinos; f <= pasosFinos; f++) {
-                let anguloFino = mejorAngulo + (f / pasosFinos) * rangoRefinamiento;
-                let candidato = calcularPuntoInterseccion(latC, lonC, rad, anguloFino);
-                let dist = calcularDistanciaHaver(antPoint, candidato) + calcularDistanciaHaver(candidato, sigPoint);
-
-                if (dist < menorDistancia) {
-                  menorDistancia = dist;
-                  mejorPunto = candidato;
-                }
-              }
-
-              puntosOptimos[i] = mejorPunto;
+            let candidatosAngulos = [];
+            const pasos = 36;
+            for (let a = 0; a < pasos; a++) {
+              candidatosAngulos.push((2 * Math.PI * a) / pasos);
             }
+
+            candidatosAngulos.push(calcularRumbo(latC, lonC, antPoint[0], antPoint[1]));
+            candidatosAngulos.push(calcularRumbo(latC, lonC, sigPoint[0], sigPoint[1]));
+
+            let mejorAngulo = 0;
+            for (let angulo of candidatosAngulos) {
+              let candidato = calcularPuntoInterseccion(latC, lonC, rad, angulo);
+              let dist = calcularDistanciaHaver(antPoint, candidato) + calcularDistanciaHaver(candidato, sigPoint);
+
+              if (dist < menorDistancia) {
+                menorDistancia = dist;
+                mejorPunto = candidato;
+                mejorAngulo = angulo;
+              }
+            }
+
+            // Refinament d'alta precisió local (20 passades)
+            const rangoRefinamiento = (20 * Math.PI) / 180;
+            const pasosFinos = 20;
+            for (let f = -pasosFinos; f <= pasosFinos; f++) {
+              let anguloFino = mejorAngulo + (f / pasosFinos) * rangoRefinamiento;
+              let candidato = calcularPuntoInterseccion(latC, lonC, rad, anguloFino);
+              let dist = calcularDistanciaHaver(antPoint, candidato) + calcularDistanciaHaver(candidato, sigPoint);
+
+              if (dist < menorDistancia) {
+                menorDistancia = dist;
+                mejorPunto = candidato;
+              }
+            }
+
+            puntosOptimos[i] = mejorPunto;
           }
         }
       }
@@ -1155,7 +1141,6 @@
       }
     }
 
-    /* FUNCIONS PER A DESAR I CARREGAR A LOCALSTORAGE */
     function saveCurrentTaskLocal() {
       if (taskTurnpoints.length === 0) {
         alert("Has d'afegir almenys una balisa per desar la màniga.");
