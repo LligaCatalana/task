@@ -409,7 +409,7 @@
 
   <div id="sidebar">
     <div class="header" onclick="toggleSidebarMobile()">
-      <h1>🪂 Dissenyador de Mànigues (XCTSK) v5.7</h1>
+      <h1>🪂 Dissenyador de Mànigues (XCTSK) v5.9</h1>
     </div>
 
     <div class="content">
@@ -480,6 +480,17 @@
 
         <div class="time-grid">
           <div>
+            <label for="windowOpenTime">Window Open:</label>
+            <input type="time" id="windowOpenTime" value="12:00">
+          </div>
+          <div>
+            <label for="windowCloseTime">Window Close:</label>
+            <input type="time" id="windowCloseTime" value="14:00">
+          </div>
+        </div>
+
+        <div class="time-grid" style="margin-top: 4px;">
+          <div>
             <label for="sssTime">SSS (Local):</label>
             <input type="time" id="sssTime" value="13:00">
           </div>
@@ -519,11 +530,11 @@
     const topoMap = L.tileLayer('https://{s}.tile.opentopomap.org/{z}/{x}/{y}.png', {
       maxZoom: 17,
       attribution: 'Map data: &copy; OpenStreetMap, SRTM | Map style: &copy; OpenTopoMap'
-    }).addTo(map);
+    });
 
     const esriWorldTopo = L.tileLayer('https://server.arcgisonline.com/ArcGIS/rest/services/World_Topo_Map/MapServer/tile/{z}/{y}/{x}', {
       attribution: 'Tiles &copy; Esri'
-    });
+    }).addTo(map);
     // Definició de la nova capa de satèl·lit
 const esriSat = L.tileLayer('https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}', {
   attribution: 'Tiles &copy; Esri &mdash; Source: Esri, i-cubed, USDA, USGS, AEX, GeoEye, Getmapping, Aerogrid, IGN, IGP, UPR-EGP, and the GIS User Community'
@@ -1302,6 +1313,8 @@ bellmunt: `OziExplorer Waypoint File Version 1.0\nWGS 84\nReserved 2\nReserved 3
     function buildXCTSKObject() {
       const sssTime = document.getElementById('sssTime').value;
       const taskDeadline = document.getElementById('taskDeadline').value;
+      const windowOpenTime = document.getElementById('windowOpenTime').value;
+      const windowCloseTime = document.getElementById('windowCloseTime').value;
 
       return {
         earthModel: "WGS84",
@@ -1313,6 +1326,10 @@ bellmunt: `OziExplorer Waypoint File Version 1.0\nWGS 84\nReserved 2\nReserved 3
           direction: "EXIT",
           timeGates: [formatXContestTime(sssTime)],
           type: "RACE"
+        },
+        takeoff: {
+          timeOpen: formatXContestTime(windowOpenTime),
+          timeClose: formatXContestTime(windowCloseTime)
         },
         taskType: "CLASSIC",
         turnpoints: taskTurnpoints.map((tp, idx) => {
