@@ -547,11 +547,6 @@ L.control.layers({
   "Satèl·lit (Esri)": esriSat
 }).addTo(map);
 
-    L.control.layers({
-      "OpenTopoMap (Relleu)": topoMap,
-      "Esri Topo": esriWorldTopo
-    }).addTo(map);
-
     window.addEventListener('resize', () => { map.invalidateSize(); });
     window.addEventListener('orientationchange', () => { setTimeout(() => map.invalidateSize(), 300); });
     setTimeout(() => { map.invalidateSize(); }, 500);
