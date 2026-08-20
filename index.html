@@ -4,6 +4,10 @@
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>Gestor de Mànigues Parapent - XCTSK</title>
+  
+  <!-- Leaflet CSS -->
+  <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
+
   <style>
     * {
       box-sizing: border-box;
@@ -19,7 +23,7 @@
     }
     .container {
       width: 100%;
-      max-width: 600px;
+      max-width: 900px;
       background: #ffffff;
       border-radius: 12px;
       box-shadow: 0 4px 12px rgba(0, 0, 0, 0.05);
@@ -51,7 +55,7 @@
       font-weight: 600;
       color: #475569;
     }
-    input[type="text"], input[type="time"], select {
+    input[type="text"], input[type="number"], input[type="time"], select {
       width: 100%;
       padding: 8px 12px;
       margin-top: 4px;
@@ -59,6 +63,14 @@
       border: 1px solid #cbd5e1;
       border-radius: 6px;
       font-size: 0.95rem;
+    }
+    #map {
+      width: 100%;
+      height: 400px;
+      border-radius: 8px;
+      border: 1px solid #cbd5e1;
+      margin-top: 10px;
+      z-index: 1;
     }
     .time-grid {
       display: flex;
@@ -87,10 +99,10 @@
       font-weight: 700;
       color: #0284c7;
     }
-    .btn-export {
+    .btn {
       width: 100%;
       padding: 10px 16px;
-      background: #16a34a;
+      background: #0284c7;
       color: #ffffff;
       border: none;
       border-radius: 6px;
@@ -98,6 +110,12 @@
       font-size: 0.95rem;
       cursor: pointer;
       transition: background 0.2s;
+    }
+    .btn:hover {
+      background: #0369a1;
+    }
+    .btn-export {
+      background: #16a34a;
     }
     .btn-export:hover {
       background: #15803d;
@@ -118,6 +136,14 @@
       align-items: center;
       font-size: 0.9rem;
     }
+    .tp-item button {
+      background: #ef4444;
+      color: white;
+      border: none;
+      padding: 4px 8px;
+      border-radius: 4px;
+      cursor: pointer;
+    }
   </style>
 </head>
 <body>
@@ -132,15 +158,34 @@
     <input type="text" id="taskCodeInput" placeholder="Ex: MANIGA_01" value="MANIGA_01" oninput="updateTaskCodeDisplay()">
   </div>
 
-  <!-- Sección 2: Balises de la Màniga -->
+  <!-- Sección 2: Mapa i Gestió de Punts de Pas -->
   <div class="section">
-    <h3>2. Punts de Pas (Turnpoints)</h3>
-    <ul class="tp-list" id="turnpointList">
-      <li class="tp-item"><span><b>D01</b> - Despegue (Radius: 400m)</span> <span>TAKEOFF</span></li>
-      <li class="tp-item"><span><b>B01</b> - Start Cylinder (Radius: 3000m)</span> <span>SSS</span></li>
-      <li class="tp-item"><span><b>B12</b> - Turnpoint 1 (Radius: 1000m)</span> <span>TURNPOINT</span></li>
-      <li class="tp-item"><span><b>G01</b> - Goal Line (Radius: 200m)</span> <span>ESS / GOAL</span></li>
-    </ul>
+    <h3>2. Mapa i Gestió de Punts de Pas (Turnpoints)</h3>
+    <p style="font-size: 0.85rem; color: #64748b; margin-top: 0;">Fes clic al mapa per afegir una balisa a la màniga.</p>
+    
+    <div id="map"></div>
+
+    <div style="margin-top: 15px;">
+      <label>Afegir nova balisa manualment al centre del mapa:</label>
+      <div class="time-grid">
+        <input type="text" id="newTpName" placeholder="Nom (Ex: B01)">
+        <input type="number" id="newTpRadius" placeholder="Radi (m)" value="400">
+        <select id="newTpType">
+          <option value="TAKEOFF">TAKEOFF</option>
+          <option value="SSS">SSS (Start)</option>
+          <option value="TURNPOINT" selected>TURNPOINT</option>
+          <option value="ESS">ESS</option>
+          <option value="GOAL">GOAL</option>
+        </select>
+      </div>
+      <button class="btn" style="margin-top: 5px;" onclick="addTurnpointFromForm()">➕ Afegir Balisa</button>
+    </div>
+  </div>
+
+  <!-- Sección 3: Llista de Balises -->
+  <div class="section">
+    <h3>3. Punts de la Màniga</h3>
+    <ul class="tp-list" id="turnpointList"></ul>
   </div>
 
   <!-- Sección 4: Horaris i Exportació -->
@@ -179,38 +224,112 @@
     </div>
 
     <div class="time-grid" style="margin-top: 12px;">
-      <button class="btn-export" onclick="exportXCTSK()">💾 .XCTSK</button>
-      <button class="btn-export" style="background: #0284c7;" onclick="openXContestTool()">🚀 XContest</button>
+      <button class="btn btn-export" onclick="exportXCTSK()">💾 .XCTSK</button>
+      <button class="btn" style="background: #0284c7;" onclick="openXContestTool()">🚀 XContest</button>
     </div>
   </div>
 </div>
 
+<!-- Leaflet JS -->
+<script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+
 <script>
   let currentTaskCode = "MANIGA_01";
-  
-  // Dades d'exemple de balises
+  let map, mapMarkers = [], mapCircles = [], polyline;
+
+  // Dades d'exemple
   let taskTurnpoints = [
-    {
-      type: "TAKEOFF",
-      radius: 400,
-      wpt: { name: "D01", lat: 42.1234, lon: 2.1234, alt: 1200 }
-    },
-    {
-      type: "SSS",
-      radius: 3000,
-      wpt: { name: "B01", lat: 42.1500, lon: 2.1800, alt: 1000 }
-    },
-    {
-      type: "TURNPOINT",
-      radius: 1000,
-      wpt: { name: "B12", lat: 42.2000, lon: 2.2500, alt: 1500 }
-    },
-    {
-      type: "ESS",
-      radius: 200,
-      wpt: { name: "G01", lat: 42.2500, lon: 2.3000, alt: 800 }
-    }
+    { type: "TAKEOFF", radius: 400, wpt: { name: "D01", lat: 42.1234, lon: 2.1234, alt: 1200 } },
+    { type: "SSS", radius: 3000, wpt: { name: "B01", lat: 42.1500, lon: 2.1800, alt: 1000 } },
+    { type: "TURNPOINT", radius: 1000, wpt: { name: "B12", lat: 42.2000, lon: 2.2500, alt: 1500 } },
+    { type: "ESS", radius: 200, wpt: { name: "G01", lat: 42.2500, lon: 2.3000, alt: 800 } }
   ];
+
+  function initMap() {
+    map = L.map('map').setView([42.18, 2.20], 11);
+
+    L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+      maxZoom: 18,
+      attribution: '© OpenStreetMap'
+    }).addTo(map);
+
+    // Clic en el mapa per crear una balisa
+    map.on('click', function(e) {
+      const name = prompt("Nom del punt de pas:", `TP${taskTurnpoints.length + 1}`);
+      if (name) {
+        taskTurnpoints.push({
+          type: "TURNPOINT",
+          radius: 1000,
+          wpt: { name: name, lat: e.latlng.lat, lon: e.latlng.lng, alt: 0 }
+        });
+        renderTask();
+      }
+    });
+
+    renderTask();
+  }
+
+  function renderTask() {
+    // Netejar capes del mapa
+    mapMarkers.forEach(m => map.removeLayer(m));
+    mapCircles.forEach(c => map.removeLayer(c));
+    if (polyline) map.removeLayer(polyline);
+    mapMarkers = [];
+    mapCircles = [];
+
+    const listEl = document.getElementById('turnpointList');
+    listEl.innerHTML = '';
+
+    const latLngs = [];
+
+    taskTurnpoints.forEach((tp, index) => {
+      const pos = [tp.wpt.lat, tp.wpt.lon];
+      latLngs.push(pos);
+
+      // Marcador i cercle del radi
+      const marker = L.marker(pos).addTo(map).bindPopup(`<b>${tp.wpt.name}</b> (${tp.type})<br>Radi: ${tp.radius}m`);
+      const circle = L.circle(pos, { radius: tp.radius, color: '#0284c7', weight: 2, fillOpacity: 0.15 }).addTo(map);
+
+      mapMarkers.push(marker);
+      mapCircles.push(circle);
+
+      // Renderització a la llista
+      const li = document.createElement('li');
+      li.className = 'tp-item';
+      li.innerHTML = `
+        <span><b>${tp.wpt.name}</b> - ${tp.type} (${tp.radius}m)</span>
+        <button onclick="removeTurnpoint(${index})">🗑️</button>
+      `;
+      listEl.appendChild(li);
+    });
+
+    // Dibuixar línia de la ruta
+    if (latLngs.length > 1) {
+      polyline = L.polyline(latLngs, { color: '#0284c7', weight: 3, dashArray: '5, 10' }).addTo(map);
+      map.fitBounds(polyline.getBounds(), { padding: [30, 30] });
+    }
+  }
+
+  function addTurnpointFromForm() {
+    const name = document.getElementById('newTpName').value || `TP${taskTurnpoints.length + 1}`;
+    const radius = parseFloat(document.getElementById('newTpRadius').value) || 1000;
+    const type = document.getElementById('newTpType').value;
+
+    const center = map.getCenter();
+    taskTurnpoints.push({
+      type: type,
+      radius: radius,
+      wpt: { name: name, lat: center.lat, lon: center.lng, alt: 0 }
+    });
+
+    document.getElementById('newTpName').value = '';
+    renderTask();
+  }
+
+  function removeTurnpoint(index) {
+    taskTurnpoints.splice(index, 1);
+    renderTask();
+  }
 
   function updateTaskCodeDisplay() {
     const val = document.getElementById('taskCodeInput').value;
@@ -238,7 +357,6 @@
     const windowOpenVal = document.getElementById('windowOpenTime').value;
     const windowCloseVal = document.getElementById('windowCloseTime').value;
 
-    // Construcció del array de turnpoints
     const formattedTurnpoints = taskTurnpoints.map((tp) => {
       const item = {
         radius: Math.round(tp.radius),
@@ -255,7 +373,6 @@
       return item;
     });
 
-    // Estructura principal del fitxer XCTSK amb el nou objecte takeoff
     const xctskData = {
       taskType: "CLASSIC",
       version: 1,
@@ -297,6 +414,8 @@
   function openXContestTool() {
     alert("Funció XContest");
   }
+
+  window.onload = initMap;
 </script>
 </body>
 </html>
